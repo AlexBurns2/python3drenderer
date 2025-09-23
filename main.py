@@ -2,12 +2,13 @@ import tkinter as tk
 import numpy as np
 from PIL import Image, ImageTk
 import math
+from itertools import product
 
 WIDTH, HEIGHT = 300, 300  # lower res for speed
 
 vertices = [
-    (-1,-1,-1,0),(1,-1,-1,0),(1,1,-1,0),(-1,1,-1,0),
-    (-1,-1, 1,0),(1,-1, 1,0),(1,1, 1,0),(-1,1, 1,0)
+    (-1,-1,-1),(1,-1,-1),(1,1,-1),(-1,1,-1),
+    (-1,-1, 1),(1,-1, 1),(1,1, 1),(-1,1, 1)
 ]
 
 tris = [
@@ -30,6 +31,7 @@ colors = [
 
 angle_x, angle_y = 0.5, 0.5
 zoom = 200
+last_mouse = None
 
 def rotate_point(x,y,z,ax,ay):
     cosx,sinx = math.cos(ax), math.sin(ax)
@@ -37,18 +39,6 @@ def rotate_point(x,y,z,ax,ay):
     cosy,siny = math.cos(ay), math.sin(ay)
     x,z = x*cosy + z*siny, -x*siny + z*cosy #y axis rotation matrix
     return x,y,z
-
-def rotate_4d(x,y,z,w,ax,ay):
-    cos, sin = math.cos, math.sin
-
-    c, s = cos(ax), sin(ay)
-    x, y = c*x - s*y, s*x + c*y
-    return x, y, z, w
-
-def project4dto3d(x,y,z,w, dist):
-    factor = dist / (w+dist)
-    return x*factor, y*factor, z*factor
-
 
 def project_point(x,y,z):
     fov,dist = 256,4 #abritrary fov
@@ -60,10 +50,8 @@ def draw_scene():
     zbuf = np.full((HEIGHT,WIDTH), np.inf, dtype=np.float32) #z buffer definition
     img = np.zeros((HEIGHT,WIDTH,3), dtype=np.uint8) #all black
 
-  #  transformed = [rotate_point(*v,angle_x,angle_y) for v in vertices]
-    transformed = [rotate_4d(*v,angle_x,angle_y) for v in vertices]
-   # projected = [project_point(*v) for v in transformed]
-    projected = [project_point(*project4dto3d(*v,4)) for v in transformed]
+    transformed = [rotate_point(*v,angle_x,angle_y) for v in vertices]
+    projected = [project_point(*v) for v in transformed]
 
     for tri,col in zip(tris,colors):
         (x0,y0,z0),(x1,y1,z1),(x2,y2,z2) = [projected[i] for i in tri] #screen coords
@@ -93,18 +81,38 @@ def update():
     canvas.photo = photo
     root.after(20,update)
 
-def on_key(event):
-    global angle_x, angle_y, zoom
-    if event.keysym=="Left": angle_y -= 0.1
-    elif event.keysym=="Right": angle_y += 0.1
-    elif event.keysym=="Up": angle_x -= 0.1
-    elif event.keysym=="Down": angle_x += 0.1
-    elif event.keysym=="plus": zoom += 10
-    elif event.keysym=="minus": zoom -= 10
+
+def on_mouse_down(event):
+    global last_mouse
+    last_mouse = (event.x, event.y)
+
+def on_mouse_drag(event):
+    global last_mouse, angle_x, angle_y
+    if last_mouse is not None:
+        dx = event.x - last_mouse[0]
+        dy = event.y - last_mouse[1]
+        angle_x -= dy * 0.005
+        angle_y -= dx * 0.005
+        last_mouse = (event.x, event.y)
+
+def on_mouse_up(event):
+    global last_mouse
+    last_mouse = None
+
+def on_mouse_scroll(event):
+    global zoom
+    if event.delta > 0:   # zoom in
+        zoom += 20
+    else:                 # zoom out
+        zoom = max(20, zoom-20)
+
 
 root = tk.Tk()
 canvas = tk.Canvas(root,width=WIDTH,height=HEIGHT)
 canvas.pack()
-root.bind("<Key>",on_key)
+canvas.bind("<ButtonPress-1>", on_mouse_down)
+canvas.bind("<B1-Motion>", on_mouse_drag)
+canvas.bind("<ButtonRelease-1>", on_mouse_up)
+canvas.bind("<MouseWheel>", on_mouse_scroll)
 update()
 root.mainloop()
