@@ -67,7 +67,7 @@ def draw_cube():
     for e in edges:
         x1, y1 = projected[e[0]]
         x2, y2 = projected[e[1]]
-        canvas.create_line(x1, y1, x2, y2, fill="black", width=2)
+        canvas.create_line(x1, y1, x2, y2, fill="black", width=3)
         print(projected[e[0]])
 
 def update():
@@ -76,23 +76,56 @@ def update():
 
 def on_key(event):
     global azw, ayz, zoom
-    if event.keysym == "Left":
-        angles["zw"] -= math.pi/10
-    elif event.keysym == "Right":
-        angles["zw"] += math.pi/10
-    elif event.keysym == "Up":
-        angles["yz"] -= math.pi/10
-    elif event.keysym == "Down":
-        angles["yz"] += math.pi/10
-    elif event.keysym == "plus":
+    step = 40
+    if event.keysym == "w":
+        angles["zw"] -= math.pi/step
+    if event.keysym == "s":
+        angles["zw"] += math.pi/step
+    if event.keysym == "a":
+        angles["xw"] -= math.pi/step
+    if event.keysym == "d":
+        angles["xw"] += math.pi/step
+    if event.keysym == "q":
+        angles["yw"] -= math.pi/step
+    if event.keysym == "e":
+        angles["yw"] += math.pi/step
+    if event.keysym == "plus":
         zoom += 10
-    elif event.keysym == "minus":
+    if event.keysym == "minus":
         zoom -= 10
+
+def on_mouse_down(event):
+    global last_mouse
+    last_mouse = (event.x, event.y)
+
+def on_mouse_drag(event):
+    global last_mouse, angles
+    if last_mouse is not None:
+        dx = event.x - last_mouse[0]
+        dy = event.y - last_mouse[1]
+        angles["yz"] -= dy * 0.005 # up down
+        angles["xz"] += dx * 0.005 #side to side
+        last_mouse = (event.x, event.y)
+
+def on_mouse_up(event):
+    global last_mouse
+    last_mouse = None
+
+def on_mouse_scroll(event):
+    global angles
+    if event.delta > 0:   # roll
+        angles["xy"] += math.pi/40
+    else:
+        angles["xy"] -= math.pi/40
 
 root = tk.Tk()
 root.title("Simple Cube Renderer")
 canvas = tk.Canvas(root, width=600, height=600, bg="white")
 canvas.pack()
+canvas.bind("<ButtonPress-1>", on_mouse_down)
+canvas.bind("<B1-Motion>", on_mouse_drag)
+canvas.bind("<ButtonRelease-1>", on_mouse_up)
+canvas.bind("<MouseWheel>", on_mouse_scroll)
 
 root.bind("<Key>", on_key)
 update()
