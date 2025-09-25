@@ -48,17 +48,24 @@ class Quaternion:
         self.y = y
         self.z = z
 
-    def multiply(a, b):
-        w = a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z
-        x = a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y
-        y = a.w*b.y + a.x*b.z + a.y*b.w - a.z*b.x
-        z = a.w*b.z + a.x*b.y + a.y*b.x - a.z*b.w
-        return w,x,y,z
+    def multiply(self, other):
+        w = self.w*other.w - self.x*other.x - self.y*other.y - self.z*other.z
+        x = self.w*other.x + self.x*other.w + self.y*other.z - self.z*other.y
+        y = self.w*other.y - self.x*other.z + self.y*other.w + self.z*other.x
+        z = self.w*other.z + self.x*other.y - self.y*other.x + self.z*other.w
+        return Quaternion(w,x,y,z)
     
     def conjugate(self):
-        return self.w, -self.x, -self.y, -self.z
+        return Quaternion(self.w, -self.x, -self.y, -self.z)
+    
+orientation = Quaternion(1,0,0,0)
 
 def quaternion_rotation(x,y,z,ax, ay, az, t):
+    length = math.sqrt(ax*ax + ay*ay + az*az)
+    if length == 0:
+        raise ValueError("zero rotation vector")
+    ax, ay, az = ax/length, ay/length, az/length
+
     v = Quaternion(0, x, y, z)
 
     q = Quaternion(
@@ -67,11 +74,12 @@ def quaternion_rotation(x,y,z,ax, ay, az, t):
         ay * math.sin(t/2),
         az * math.sin(t/2)
     )
-    qprime = q.conjugate
+    qprime = q.conjugate()
+    #qv = Quaternion(*q.multiply(q, v))
+    #out = qv.multiply(qv, qprime)
+
     out = q.multiply(v).multiply(qprime)
     return out.x, out.y, out.z
-
-
 
     '''
     cx = math.cos(ax/2)
@@ -116,9 +124,8 @@ def draw_scene():
     zbuf = np.full((HEIGHT,WIDTH), np.inf, dtype=np.float32) #z buffer definition
     img = np.zeros((HEIGHT,WIDTH,3), dtype=np.uint8) #all black
 
-    transformed = [quaternion_rotation(*v,angle_x,angle_y,0) for v in vertices]
     #transformed = [rotate_point(*v,angle_x,angle_y) for v in vertices]
-    projected = [project_point(*v) for v in transformed]
+    projected = [project_point(*v) for v in vertices]
 
     for tri,col in zip(tris,colors):
         (x0,y0,z0),(x1,y1,z1),(x2,y2,z2) = [projected[i] for i in tri] #screen coords
@@ -154,13 +161,22 @@ def on_mouse_down(event):
     last_mouse = (event.x, event.y)
 
 def on_mouse_drag(event):
-    global last_mouse, angle_x, angle_y
-    if last_mouse is not None:
-        dx = event.x - last_mouse[0]
-        dy = event.y - last_mouse[1]
-        angle_x += dy * 0.005
-        angle_y -= dx * 0.005
+    global last_mouse, orientation
+    if last_mouse is None:
         last_mouse = (event.x, event.y)
+        return
+    dx, dy = event.x - last_mouse[0], event.y - last_mouse[1]
+    last_mouse = (event.x, event.y)
+
+    angle = math.sqrt(dx*dx + dy*dy) * 0.01
+    if angle == 0: return
+    ax, ay, az = dy, dx, 0  # drag defines axis
+    length = math.sqrt(ax*ax + ay*ay + az*az)
+    ax, ay, az = ax/length, ay/length, az/length
+
+    dq = Quaternion(math.cos(angle/2), ax*math.sin(angle/2), ay*math.sin(angle/2), az*math.sin(angle/2))
+    orientation = (dq * orientation).normalize()
+    draw_scene()
 
 def on_mouse_up(event):
     global last_mouse
@@ -173,6 +189,19 @@ def on_mouse_scroll(event):
     else:                 # zoom out
         zoom = max(20, zoom-20)
 
+def on_key(event):
+    global orientation
+    step = 0.1
+    if event.keysym.lower() == "w":
+        orientation.w += step if not event.state & 0x1 else -step
+    elif event.keysym.lower() == "a":
+        orientation.x += step if not event.state & 0x1 else -step
+    elif event.keysym.lower() == "s":
+        orientation.y += step if not event.state & 0x1 else -step
+    elif event.keysym.lower() == "d":
+        orientation.z += step if not event.state & 0x1 else -step
+    orientation = orientation.normalize()
+    draw_scene()
 
 root = tk.Tk()
 canvas = tk.Canvas(root,width=WIDTH,height=HEIGHT)

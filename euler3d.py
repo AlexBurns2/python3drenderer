@@ -92,7 +92,7 @@ def on_mouse_drag(event):
     if last_mouse is not None:
         dx = event.x - last_mouse[0]
         dy = event.y - last_mouse[1]
-        angle_x += dy * 0.005
+        angle_x -= dy * 0.005
         angle_y -= dx * 0.005
         last_mouse = (event.x, event.y)
 
