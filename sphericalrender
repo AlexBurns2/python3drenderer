@@ -1,0 +1,30 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image, ImageTk
+import tkinter as tk
+
+WIDTH, HEIGHT = 300, 300 
+
+radius = 1
+anglex, angley = 180, 0
+
+def draw_scene():
+    global anglex, angley
+    img = np.zeros((HEIGHT,WIDTH,3), dtype=np.uint8)
+    for i in WIDTH
+    return img
+
+def update():
+    img_array = draw_scene()
+    image = Image.fromarray(img_array, "RGB")
+    photo = ImageTk.PhotoImage(image)
+    canvas.create_image(0,0,image=photo,anchor="nw")
+    canvas.photo = photo
+    root.after(20,update)
+
+
+root = tk.Tk()
+canvas = tk.Canvas(root,width=WIDTH,height=HEIGHT)
+canvas.pack()
+update()
+root.mainloop()
