@@ -3,7 +3,7 @@ import cv2
 import math
 import time
 from itertools import product
-
+from rendering import *
 WIDTH, HEIGHT = 1920, 1080  # lower res for speed
 
 vertices = [
@@ -56,9 +56,11 @@ def vectormod(x,y,z):
 def project_point(x,y,z):
     fov, imagePlaneDist = 256, 1.0
     dist = ((cam_pos[0] - x) ** 2 + (cam_pos[1] - y) ** 2 + (cam_pos[2] - z) ** 2) ** 0.5 # dist from cam to point
+
     camvectx = math.cos(cam_rot_y) * math.cos(cam_rot_y) # convert cam rotation in rad to 3d vector
     camvecty = math.sin(cam_rot_y) * math.cos(cam_rot_y)
     camvectz = math.sin(cam_rot_x)
+    
     dotprod = (camvectx * ((cam_pos[0] - x))) + (camvecty * ((cam_pos[1] - y))) + (camvectz * ((cam_pos[2] - z))) # step 1 for opp side length - dot prod to get angle between cam direction and point direction from cam
     angle = math.acos(dotprod / (vectormod(camvectx, camvecty, camvectz) * dist)) # angle between cam dir and point dir
     x = dist/math.sin(angle)
