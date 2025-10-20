@@ -4,6 +4,7 @@ import math
 import time
 from itertools import product
 from rendering import *
+from vectormath import *
 WIDTH, HEIGHT = 1920, 1080  # lower res for speed
 
 vertices = [
@@ -50,20 +51,25 @@ def world_to_view(v):
     rel = rotate_point(*rel, -cam_rot_x, -cam_rot_y)
     return rel
 
-def vectormod(x,y,z):
-    return (x**2 + y**2 + z**2) ** 0.5
-
 def project_point(x,y,z):
     fov, imagePlaneDist = 256, 1.0
+
     dist = ((cam_pos[0] - x) ** 2 + (cam_pos[1] - y) ** 2 + (cam_pos[2] - z) ** 2) ** 0.5 # dist from cam to point
 
     camvectx = math.cos(cam_rot_y) * math.cos(cam_rot_y) # convert cam rotation in rad to 3d vector
     camvecty = math.sin(cam_rot_y) * math.cos(cam_rot_y)
     camvectz = math.sin(cam_rot_x)
-    
+
     dotprod = (camvectx * ((cam_pos[0] - x))) + (camvecty * ((cam_pos[1] - y))) + (camvectz * ((cam_pos[2] - z))) # step 1 for opp side length - dot prod to get angle between cam direction and point direction from cam
     angle = math.acos(dotprod / (vectormod(camvectx, camvecty, camvectz) * dist)) # angle between cam dir and point dir
     x = dist/math.sin(angle)
+
+    cam2point = []
+    cam2point[0], cam2point[1], cam2point[2] = (cam_pos[0] - x), (cam_pos[1] - y), (cam_pos[2] - z)
+    
+    projPoint = []
+    projPoint[0] = ((dotProduct(cam2point, camvectx, camvecty, camvectz)) / vectormod(camvectx, camvecty, camvectz)**2)
+
     factor = fov / (dist + imagePlaneDist)
     return int(x * factor * zoom / 100 + WIDTH/2), int(-y * factor * zoom / 100 + HEIGHT/2), z
 
