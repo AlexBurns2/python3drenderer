@@ -29,8 +29,8 @@ colors = [
     (0,255,255),(0,255,255)
 ]
 
-cam_pos = np.array([0.0, 0.0, -5.0])
-cam_rot_x, cam_rot_y = 0.0, 0.0
+cam_pos = np.array([0.0, 0.0, 0.0])
+cam_rot_x, cam_rot_y = 0.0, 1.0
 zoom = 200
 
 last_mouse = None
@@ -50,9 +50,19 @@ def world_to_view(v):
     rel = rotate_point(*rel, -cam_rot_x, -cam_rot_y)
     return rel
 
+def vectormod(x,y,z):
+    return (x**2 + y**2 + z**2) ** 0.5
+
 def project_point(x,y,z):
-    fov, dist = 256, 1.0
-    factor = fov / (z + dist)
+    fov, imagePlaneDist = 256, 1.0
+    dist = ((cam_pos[0] - x) ** 2 + (cam_pos[1] - y) ** 2 + (cam_pos[2] - z) ** 2) ** 0.5 # dist from cam to point
+    camvectx = math.cos(cam_rot_y) * math.cos(cam_rot_y) # convert cam rotation in rad to 3d vector
+    camvecty = math.sin(cam_rot_y) * math.cos(cam_rot_y)
+    camvectz = math.sin(cam_rot_x)
+    dotprod = (camvectx * ((cam_pos[0] - x))) + (camvecty * ((cam_pos[1] - y))) + (camvectz * ((cam_pos[2] - z))) # step 1 for opp side length - dot prod to get angle between cam direction and point direction from cam
+    angle = math.acos(dotprod / (vectormod(camvectx, camvecty, camvectz) * dist)) # angle between cam dir and point dir
+    x = dist/math.sin(angle)
+    factor = fov / (dist + imagePlaneDist)
     return int(x * factor * zoom / 100 + WIDTH/2), int(-y * factor * zoom / 100 + HEIGHT/2), z
 
 def backface_cull(vertices, tris, colors, camera_pos):
@@ -60,9 +70,9 @@ def backface_cull(vertices, tris, colors, camera_pos):
     unculled_colors = []
     for t in tris:
         v0, v1, v2 = vertices[t[0]], vertices[t[1]], vertices[t[2]]
-        normal = np.cross(v1 - v0, v2 - v0)
+        normal = np.cross(np.subtract(v1,v0), np.subtract(v2,v0))
         view_dir = camera_pos - v0
-        if np.dot(normal, view_dir) >= 0:
+        if np.dot(normal, view_dir) <= 0:
             unculled_tris.append(t)
             unculled_colors.append(colors[tris.index(t)])
     return np.array(unculled_tris), np.array(unculled_colors)
@@ -74,7 +84,7 @@ def draw_scene():
     transformed = [world_to_view(np.array(v)) for v in vertices]
     projected = [project_point(*v) for v in transformed]
 
-    for tri, col in zip(backface_cull(vertices, tris, colors, cam_pos)):
+    for tri, col in zip(backface_cull(vertices, tris, colors, cam_pos)[0], backface_cull(vertices, tris, colors, cam_pos)[1]):
         (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = [projected[i] for i in tri]
         xmin, xmax = max(min(x0, x1, x2), 0), min(max(x0, x1, x2), WIDTH-1)
         ymin, ymax = max(min(y0, y1, y2), 0), min(max(y0, y1, y2), HEIGHT-1)
@@ -118,6 +128,7 @@ def on_mouse(event, x, y, flags, param):
         dy = y - last_mouse[1]
         cam_rot_y -= dx * 0.005
         cam_rot_x -= dy * 0.005
+        print(f"Camera Rotation: X={cam_rot_x:.2f}, Y={cam_rot_y:.2f}")
     last_mouse = (x, y)
 
 cv2.namedWindow("CPU Renderer", cv2.WINDOW_NORMAL)

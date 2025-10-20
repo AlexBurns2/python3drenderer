@@ -11,7 +11,6 @@ anglex, angley = 180, 0
 def draw_scene():
     global anglex, angley
     img = np.zeros((HEIGHT,WIDTH,3), dtype=np.uint8)
-    for i in WIDTH
     return img
 
 def update():
