@@ -30,8 +30,9 @@ colors = [
     (0,255,255),(0,255,255)
 ]
 
+playerUp = np.array([0.0, 1.0, 0.0])
 cam_pos = np.array([0.0, 0.0, 0.0])
-cam_rot_x, cam_rot_y = 0.0, 1.0
+cam_rot_x, cam_rot_y = 0.0, np.pi/2 # yaw, pitch
 zoom = 200
 
 last_mouse = None
@@ -48,17 +49,22 @@ def rotate_point(x,y,z,ax,ay):
 
 def world_to_view(v):
     rel = v - cam_pos
-    rel = rotate_point(*rel, -cam_rot_x, -cam_rot_y)
     return rel
 
 def project_point(x,y,z):
+    global cam_pos, cam_rot_x, cam_rot_y, playerUp
     fov, imagePlaneDist = 256, 1.0
 
-    dist = ((cam_pos[0] - x) ** 2 + (cam_pos[1] - y) ** 2 + (cam_pos[2] - z) ** 2) ** 0.5 # dist from cam to point
+    # DEFINITIONS
+    origin = cam_pos # plane origin
+    camvectx = math.cos(cam_rot_y) * math.sin(cam_rot_x) # convert cam rotation in rad to 3d vector
+    camvecty = math.sin(cam_rot_y)
+    camvectz = math.cos(cam_rot_y) * math.cos(cam_rot_x)
 
-    camvectx = math.cos(cam_rot_y) * math.cos(cam_rot_y) # convert cam rotation in rad to 3d vector
-    camvecty = math.sin(cam_rot_y) * math.cos(cam_rot_y)
-    camvectz = math.sin(cam_rot_x)
+    camXaxis = crossProduct(camvectx, camvecty, camvectz, *playerUp) # camera X axis
+    camYaxis = crossProduct(*camXaxis, camvectx, camvecty, camvectz) # camera Y axis
+
+    dist = ((cam_pos[0] - x) ** 2 + (cam_pos[1] - y) ** 2 + (cam_pos[2] - z) ** 2) ** 0.5 # dist from cam to point
 
     dotprod = (camvectx * ((cam_pos[0] - x))) + (camvecty * ((cam_pos[1] - y))) + (camvectz * ((cam_pos[2] - z))) # step 1 for opp side length - dot prod to get angle between cam direction and point direction from cam
     angle = math.acos(dotprod / (vectormod(camvectx, camvecty, camvectz) * dist)) # angle between cam dir and point dir
@@ -134,8 +140,8 @@ def on_mouse(event, x, y, flags, param):
     if last_mouse is not None:
         dx = x - last_mouse[0]
         dy = y - last_mouse[1]
-        cam_rot_y -= dx * 0.005
-        cam_rot_x -= dy * 0.005
+        cam_rot_y -= dy * 0.005
+        cam_rot_x -= dx * 0.005
         print(f"Camera Rotation: X={cam_rot_x:.2f}, Y={cam_rot_y:.2f}")
     last_mouse = (x, y)
 
