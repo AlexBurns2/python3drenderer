@@ -61,8 +61,8 @@ def project_point(x,y,z):
     camvecty = math.sin(cam_rot_y)
     camvectz = math.cos(cam_rot_y) * math.cos(cam_rot_x)
 
-    camXaxis = crossProduct(camvectx, camvecty, camvectz, *playerUp) # camera X axis
-    camYaxis = crossProduct(*camXaxis, camvectx, camvecty, camvectz) # camera Y axis
+    camXaxis = crossProduct(camvectx, camvecty, camvectz, *playerUp) # camera X axis global vector
+    camYaxis = crossProduct(*camXaxis, camvectx, camvecty, camvectz) # camera Y axis global vector
 
     dist = ((cam_pos[0] - x) ** 2 + (cam_pos[1] - y) ** 2 + (cam_pos[2] - z) ** 2) ** 0.5 # dist from cam to point
 
