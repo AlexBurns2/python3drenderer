@@ -3,18 +3,15 @@ import cv2
 import math
 import time
 
-# -----------------------
-# Config / Scene
-# -----------------------
-WIDTH, HEIGHT = 1280, 720          # lower res for speed; change if you like
-FPS_SLEEP = 0.001                  # small sleep to keep UI responsive
-FOV_DEGREES = 60.0                 # vertical field of view in degrees
+
+WIDTH, HEIGHT = 1280, 720 
+FPS_SLEEP = 0.001 
+FOV_DEGREES = 60.0 
 NEAR_CLIP = 0.01
-ZOOM = 1.0                         # multiplies focal length
+ZOOM = 1.0
 LIGHT_DIR = np.array([0.5, 1.0, -0.7], dtype=np.float32)
 LIGHT_DIR = LIGHT_DIR / (np.linalg.norm(LIGHT_DIR) + 1e-12)
 
-# cube geometry (you had this already)
 vertices = np.array([
     (-1,-1,-1),(1,-1,-1),(1,1,-1),(-1,1,-1),
     (-1,-1, 1),(1,-1, 1),(1,1, 1),(-1,1, 1)
@@ -38,9 +35,6 @@ colors = np.array([
     (0,255,255),(0,255,255)
 ], dtype=np.uint8)
 
-# -----------------------
-# Camera / controls
-# -----------------------
 playerUp = np.array([0.0, 1.0, 0.0], dtype=np.float32)
 cam_pos = np.array([0.0, 0.0, -6.0], dtype=np.float32)   # moved back to see object
 yaw = 0.0    # rotation around Y (left/right)
@@ -60,14 +54,8 @@ tri_v2_idx = tris[:, 2]
 fov_rad = math.radians(FOV_DEGREES)
 focal_px = (HEIGHT / 2.0) / math.tan(fov_rad / 2.0)  # standard pinhole model
 
-# -----------------------
-# Math helpers (vectorized)
-# -----------------------
 def build_camera_rotation_matrix(yaw, pitch):
-    """
-    Builds rotation matrix for camera looking along -Z (OpenGL style).
-    Applies yaw (around Y) then pitch (around X).
-    """
+
     cy, sy = math.cos(yaw), math.sin(yaw)
     cx, sx = math.cos(pitch), math.sin(pitch)
 
@@ -87,10 +75,6 @@ def build_camera_rotation_matrix(yaw, pitch):
     return Rx @ Ry
 
 def world_to_view_all(verts, cam_pos, yaw, pitch):
-    """
-    Vectorized transform of all vertices into view (camera) space.
-    Returns shape (N,3) array.
-    """
     rel = (verts - cam_pos).astype(np.float32)  # translate
     R = build_camera_rotation_matrix(yaw, pitch)  # 3x3
     return (R @ rel.T).T  # (N,3)
