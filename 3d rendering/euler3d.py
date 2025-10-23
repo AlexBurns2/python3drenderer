@@ -5,7 +5,7 @@ import time
 from itertools import product
 from rendering import *
 from vectormath import *
-WIDTH, HEIGHT = 1920, 1080  # lower res for speed
+WIDTH, HEIGHT = 600, 400  # lower res for speed
 
 vertices = [
     (-1,-1,-1),(1,-1,-1),(1,1,-1),(-1,1,-1),
@@ -56,7 +56,6 @@ def project_point(x,y,z):
     fov, imagePlaneDist = 256, 1.0
 
     # DEFINITIONS
-    origin = cam_pos # plane origin
     camvectx = math.cos(cam_rot_y) * math.sin(cam_rot_x) # convert cam rotation in rad to 3d vector
     camvecty = math.sin(cam_rot_y)
     camvectz = math.cos(cam_rot_y) * math.cos(cam_rot_x)
@@ -66,8 +65,10 @@ def project_point(x,y,z):
 
     dist = ((cam_pos[0] - x) ** 2 + (cam_pos[1] - y) ** 2 + (cam_pos[2] - z) ** 2) ** 0.5 # dist from cam to point
 
-    cam2point = []
-    cam2point[0], cam2point[1], cam2point[2] = (cam_pos[0] - x), (cam_pos[1] - y), (cam_pos[2] - z)
+    cam2point = np.array([0, 0, 0])
+    cam2point[0] = cam_pos[0] - x
+    cam2point[1] = cam_pos[1] - y
+    cam2point[2] = cam_pos[2] - z
 
     orthox = dotProduct(*camXaxis, *(-cam2point))/vectormod(*camXaxis)
     orthoy = dotProduct(*camYaxis, *(-cam2point))/vectormod(*camYaxis)
@@ -76,9 +77,10 @@ def project_point(x,y,z):
     angle = math.acos(dotprod / (vectormod(camvectx, camvecty, camvectz) * dist)) # angle between cam dir and point dir
     x = dist/math.sin(angle)
 
+    return int(orthox), int(orthoy), dist
 
-    factor = fov / (dist + imagePlaneDist)
-    return int(x * factor * zoom / 100 + WIDTH/2), int(-y * factor * zoom / 100 + HEIGHT/2), z
+   # factor = fov / (dist + imagePlaneDist)
+    #return int(x * factor * zoom / 100 + WIDTH/2), int(-y * factor * zoom / 100 + HEIGHT/2), z
 
 def backface_cull(vertices, tris, colors, camera_pos):
     unculled_tris = []
@@ -90,14 +92,15 @@ def backface_cull(vertices, tris, colors, camera_pos):
         if np.dot(normal, view_dir) <= 0:
             unculled_tris.append(t)
             unculled_colors.append(colors[tris.index(t)])
+    return np.array(tris), np.array(colors)
     return np.array(unculled_tris), np.array(unculled_colors)
 
 def draw_scene():
     zbuf = np.full((HEIGHT, WIDTH), np.inf, dtype=np.float32)
     img = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
 
-    transformed = [world_to_view(np.array(v)) for v in vertices]
-    projected = [project_point(*v) for v in transformed]
+    #transformed = [world_to_view(np.array(v)) for v in vertices]
+    projected = [project_point(*v) for v in vertices]
 
     for tri, col in zip(backface_cull(vertices, tris, colors, cam_pos)[0], backface_cull(vertices, tris, colors, cam_pos)[1]):
         (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = [projected[i] for i in tri]
