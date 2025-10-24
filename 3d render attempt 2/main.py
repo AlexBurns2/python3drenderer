@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import math
 import time
+from mathfunctions import *
 
 WIDTH, HEIGHT = 1280, 720 
 FPS_SLEEP = 0.001 
@@ -53,8 +54,16 @@ def worldtoscreen(vertices):
     vz = vertices[:, 2].astype(np.float32)
     global cam_pos, yaw, piss, playerUp
 
-    camRotVectorx = 
+    camRotVectorX = math.cos(yaw) * math.cos(piss)
+    camRotVectorY = math.sin(yaw) * math.cos(piss)
+    camRotVectorZ = math.sin(piss)
 
+    camXaxis = crossProduct(camRotVectorX, camRotVectorY, camRotVectorZ, *playerUp) # camera X axis global vector
+    camYaxis = crossProduct(*camXaxis, camRotVectorX, camRotVectorY, camRotVectorZ) # camera Y axis global vector
+    camXaxis = camXaxis / vectormod(camXaxis) #normalise
+    camYaxis = camYaxis / vectormod(camYaxis)
+
+    ray = np.array([vx - cam_pos[0], vy - cam_pos[1], vz - cam_pos[2]])
 
 
 

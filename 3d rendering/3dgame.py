@@ -45,7 +45,6 @@ mouse_sensitivity = 0.003
 
 move_speed = 0.25
 
-# Pre-calc indices for triangles to speed lookups
 tri_v0_idx = tris[:, 0]
 tri_v1_idx = tris[:, 1]
 tri_v2_idx = tris[:, 2]
