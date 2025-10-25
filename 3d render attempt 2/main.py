@@ -186,7 +186,7 @@ cv2.setMouseCallback("cube", on_mouse)
 last_time = time.time()
 while True:
     t0 = time.time()
-    frame = zbuffer_render()
+    frame = zbuffer_render(vertices, tris, colors, cam_pos, yaw, pitch, playerUp)
     # show small HUD fps
     fps = 1.0 / max(1e-6, (time.time() - last_time))
     last_time = time.time()
