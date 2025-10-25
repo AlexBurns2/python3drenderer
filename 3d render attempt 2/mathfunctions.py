@@ -6,6 +6,9 @@ from itertools import product
 def vectormod(x,y,z):
     return (x**2 + y**2 + z**2) ** 0.5
 
+def normalize(x, y,z):
+    return np.array[x,y,z]/vectormod(x,y,z)
+
 def dotProduct(x1, y1, z1, x2, y2, z2):
     return x1*x2 + y1*y2 + z1*z2
 
@@ -14,3 +17,6 @@ def crossProduct(x1, y1, z1, x2, y2, z2):
     cy = z1 * x2 - x1 * z2
     cz = x1 * y2 - y1 * x2
     return np.array([cx, cy, cz])
+
+def edgeFunction(a,b,p):
+    return (p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])
