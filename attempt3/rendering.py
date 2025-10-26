@@ -9,12 +9,15 @@ class Renderer:
         self.focal = 0.5 * self.width / np.tan(np.radians(self.fov) * 0.5)
         self.zbuffer = np.full((self.height, self.width), np.inf, dtype=np.float32)
         self.light_dir_world = self._normalize(np.array([0.6, 0.7, -0.3], dtype=float))
+
     def _normalize(self, v):
         n = np.linalg.norm(v)
         return v / n if n != 0 else v
+    
     def clear(self):
         self.zbuffer.fill(np.inf)
         return np.zeros((self.height, self.width, 3), dtype=np.uint8)
+    
     def world_to_camera(self, points, cam_pos, cam_yaw, cam_pitch):
         pts = points - cam_pos
         y = np.radians(cam_yaw)
@@ -27,12 +30,14 @@ class Renderer:
         up = np.cross(right, forward)
         M = np.stack([right, forward, up], axis=1)
         return pts.dot(M)
+    
     def backface_cull(self, tri_cam):
         v0, v1, v2 = tri_cam
         e1 = v1 - v0
         e2 = v2 - v0
         n = np.cross(e1, e2)
         return n[1] <= 0, n
+    
     def project_point(self, v):
         if v[1] <= 0:
             raise ValueError
@@ -41,13 +46,15 @@ class Renderer:
         sx = int(self.width * 0.5 + x)
         sy = int(self.height * 0.5 - z)
         return sx, sy
+    
     def shade_triangle(self, normal_world):
         n = self._normalize(normal_world)
         intensity = max(0.0, np.dot(n, -self.light_dir_world))
         base = 20
         g = int(base + 235 * intensity)
         print(g, flush=True)
-        return (g, g, g)
+        return (g, 0, 0)
+    
     def rasterize_numpy(self, frame, p2, depths, color):
         xs = np.array([p2[0][0], p2[1][0], p2[2][0]])
         ys = np.array([p2[0][1], p2[1][1], p2[2][1]])
@@ -84,6 +91,7 @@ class Renderer:
         write_x = gx_mask[replace]
         self.zbuffer[write_y, write_x] = depth_sub[replace]
         frame[write_y, write_x] = color
+
     def render_scene(self, frame, meshes, cam):
         cam_pos = cam.position
         cam_yaw = cam.yaw
