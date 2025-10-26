@@ -8,16 +8,13 @@ class Renderer:
         self.near = float(near_clip)
         self.focal = 0.5 * self.width / np.tan(np.radians(self.fov) * 0.5)
         self.zbuffer = np.full((self.height, self.width), np.inf, dtype=np.float32)
-        self.light_dir = self._normalize(np.array([0.5, -1.0, -0.3], dtype=float))
-
+        self.light_dir_world = self._normalize(np.array([0.6, -0.7, -0.3], dtype=float))
     def _normalize(self, v):
         n = np.linalg.norm(v)
         return v / n if n != 0 else v
-    
     def clear(self):
         self.zbuffer.fill(np.inf)
         return np.zeros((self.height, self.width, 3), dtype=np.uint8)
-    
     def world_to_camera(self, points, cam_pos, cam_yaw, cam_pitch):
         pts = points - cam_pos
         y = np.radians(cam_yaw)
@@ -30,14 +27,12 @@ class Renderer:
         up = np.cross(right, forward)
         M = np.stack([right, forward, up], axis=1)
         return pts.dot(M)
-    
     def backface_cull(self, tri_cam):
         v0, v1, v2 = tri_cam
         e1 = v1 - v0
         e2 = v2 - v0
         n = np.cross(e1, e2)
         return n[1] <= 0, n
-    
     def project_point(self, v):
         if v[1] <= 0:
             raise ValueError
@@ -46,12 +41,13 @@ class Renderer:
         sx = int(self.width * 0.5 + x)
         sy = int(self.height * 0.5 - z)
         return sx, sy
-    
-    def shade(self, normal):
-        i = max(0.0, np.dot(self._normalize(normal), -self.light_dir))
-        g = int(30 + 225 * i)
+    def shade_triangle(self, normal_world):
+        n = self._normalize(normal_world)
+        intensity = max(0.0, np.dot(n, -self.light_dir_world))
+        base = 20
+        g = int(base + 235 * intensity)
+        print(g, flush=True)
         return (g, g, g)
-    
     def rasterize_numpy(self, frame, p2, depths, color):
         xs = np.array([p2[0][0], p2[1][0], p2[2][0]])
         ys = np.array([p2[0][1], p2[1][1], p2[2][1]])
@@ -77,10 +73,10 @@ class Renderer:
         if not np.any(mask):
             return
         depth_map = w0 * depths[0] + w1 * depths[1] + w2 * depths[2]
-        depth_sub = depth_map[mask]
         gy_mask = gy[mask].astype(int)
         gx_mask = gx[mask].astype(int)
         zbuf_vals = self.zbuffer[gy_mask, gx_mask]
+        depth_sub = depth_map[mask]
         replace = depth_sub < zbuf_vals
         if not np.any(replace):
             return
@@ -88,7 +84,6 @@ class Renderer:
         write_x = gx_mask[replace]
         self.zbuffer[write_y, write_x] = depth_sub[replace]
         frame[write_y, write_x] = color
-
     def render_scene(self, frame, meshes, cam):
         cam_pos = cam.position
         cam_yaw = cam.yaw
@@ -96,15 +91,15 @@ class Renderer:
         for mesh in meshes:
             verts = mesh['verts_world']
             tris = mesh['tris']
+            normals = mesh['tri_normals_world']
             verts_cam = self.world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
-            for t in tris:
+            for i, t in enumerate(tris):
                 v0 = verts_cam[t[0]]
                 v1 = verts_cam[t[1]]
                 v2 = verts_cam[t[2]]
                 if v0[1] <= self.near and v1[1] <= self.near and v2[1] <= self.near:
                     continue
-                visible, n = self.backface_cull((v0, v1, v2))
-                
+                visible, _ = self.backface_cull((v0, v1, v2))
                 if not visible:
                     continue
                 try:
@@ -114,5 +109,6 @@ class Renderer:
                 except Exception:
                     continue
                 depths = np.array([v0[1], v1[1], v2[1]], dtype=np.float32)
-                color = self.shade(n)
+                color = self.shade_triangle(normals[i])
                 self.rasterize_numpy(frame, (p0, p1, p2), depths, color)
+                print(color)

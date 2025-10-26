@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import time
 from rendering import Renderer
-from objects import load_scene_from_facets, scene_facets
+from objects import scan_stl_folder, load_scene_from_facets, scene_facets as scene_facets_raw
 
 WIDTH = 1280
 HEIGHT = 720
@@ -10,6 +10,8 @@ FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
 MOVE_SPEED = 6.0
+MAX_FPS = 80.0
+STL_FOLDER = 'stl_models'
 
 class Camera:
     def __init__(self, pos, yaw=0.0, pitch=0.0):
@@ -58,13 +60,18 @@ def mouse_cb(event, x, y, flags, param):
 def run():
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
-    meshes = load_scene_from_facets(scene_facets)
+    scanned = scan_stl_folder(STL_FOLDER)
+    print(scanned)
+    facets_all = scene_facets_raw
+    meshes = load_scene_from_facets()
     cv2.namedWindow('3D', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('3D', WIDTH, HEIGHT)
     cv2.setMouseCallback('3D', mouse_cb, cam)
     last = time.time()
+    frame_time_target = 1.0 / MAX_FPS if MAX_FPS > 0 else 0.0
     while True:
-        now = time.time()
+        frame_start = time.time()
+        now = frame_start
         dt = max(1e-6, now - last)
         last = now
         frame = renderer.clear()
@@ -90,6 +97,10 @@ def run():
             cam.position += np.array([0.0, 0.0, speed])
         if key == ord('c'):
             cam.position -= np.array([0.0, 0.0, speed])
+        frame_end = time.time()
+        elapsed = frame_end - frame_start
+        if frame_time_target > 0 and elapsed < frame_time_target:
+            time.sleep(frame_time_target - elapsed)
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
