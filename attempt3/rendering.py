@@ -8,7 +8,7 @@ class Renderer:
         self.near = float(near_clip)
         self.focal = 0.5 * self.width / np.tan(np.radians(self.fov) * 0.5)
         self.zbuffer = np.full((self.height, self.width), np.inf, dtype=np.float32)
-        self.light_dir_world = self._normalize(np.array([0.6, -0.7, -0.3], dtype=float))
+        self.light_dir_world = self._normalize(np.array([0.6, 0.7, -0.3], dtype=float))
     def _normalize(self, v):
         n = np.linalg.norm(v)
         return v / n if n != 0 else v
