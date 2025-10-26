@@ -2,7 +2,8 @@ import numpy as np
 import cv2
 import time
 from rendering import Renderer
-from objects import scan_stl_folder, load_scene_from_facets, scene_facets as scene_facets_raw
+from objects import scan_stl_folder, load_scene_from_facets, scene_facets_raw
+import os
 
 WIDTH = 1280
 HEIGHT = 720
@@ -61,9 +62,8 @@ def run():
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     scanned = scan_stl_folder(STL_FOLDER)
-    print(scanned)
-    facets_all = scene_facets_raw
-    meshes = load_scene_from_facets()
+    facets_all = scene_facets_raw + scanned
+    meshes = load_scene_from_facets(facets_all)
     cv2.namedWindow('3D', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('3D', WIDTH, HEIGHT)
     cv2.setMouseCallback('3D', mouse_cb, cam)
