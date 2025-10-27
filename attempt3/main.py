@@ -4,15 +4,21 @@ import time
 from rendering import Renderer
 from objects import scan_stl_folder, load_scene_from_facets, scene_facets_raw
 import os
+from pynput import keyboard
+from pynput.keyboard import Listener
 
-WIDTH = 1280
-HEIGHT = 720
+WIDTH = 600
+HEIGHT = 400
 FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
 MOVE_SPEED = 1
 MAX_FPS = 0
 STL_FOLDER = 'stl_models'
+GRAVITY = 0.2
+AIRRESISTANCE = 0.1
+
+w,a,s,d = False, False, False, False
 
 class Camera:
     def __init__(self, pos, yaw=0.0, pitch=0.0):
@@ -58,7 +64,39 @@ def mouse_cb(event, x, y, flags, param):
         cam.pitch = -89.9
     mouse_prev = (x, y)
 
+def on_press(key):
+    try:
+        if key.char == ('w'):
+            w = True
+        if key.char == ('a'):
+            a = True
+        if key.char == ('s'):
+            s = True
+        if key.char == ('d'):
+            d = True
+
+    except AttributeError:
+        print('special key {0} pressed'.format(
+            key))
+
+def on_release(key):
+    if key.char == ('w'):
+        w = False
+    if key.char == ('a'):
+        a = False
+    if key.char == ('s'):
+        s = False
+    if key.char == ('d'):
+        d = False
+    if key == keyboard.Key.esc:
+        # Stop listener
+        return False
+
+
 def run():
+    with Listener(on_press=on_press, on_release=on_release) as listener:
+        listener.join()
+    
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     scanned = scan_stl_folder(STL_FOLDER)
@@ -85,6 +123,12 @@ def run():
         speed = MOVE_SPEED * dt
         fwd = cam.forward()
         rgt = cam.right()
+        if w == True: cam.position += fwd * speed
+        if a == True: cam.position -= rgt * speed
+        if s == True: cam.position -= fwd * speed
+        if d == True: cam.position += rgt * speed
+        
+        '''
         if key == ord('w'):
             cam.position += fwd * speed
         if key == ord('s'):
@@ -93,15 +137,34 @@ def run():
             cam.position -= rgt * speed
         if key == ord('d'):
             cam.position += rgt * speed
+        '''
         if key == ord(' '):
-            cam.position += np.array([0.0, 0.0, speed])
+            if cam.position[2] <= 0: launchPlayer(cam, np.array([0.0, 0.0, 2]))
         if key == ord('c'):
             cam.position -= np.array([0.0, 0.0, speed])
+        gravity(cam)
         frame_end = time.time()
         elapsed = frame_end - frame_start
         if frame_time_target > 0 and elapsed < frame_time_target:
             time.sleep(frame_time_target - elapsed)
     cv2.destroyAllWindows()
+
+def gravity(cam):
+    global GRAVITY
+    acceleration = 0
+    if cam.position[2] > 0:
+        acceleration += GRAVITY
+        cam.position -= np.array([0.0, 0.0, acceleration])
+    if cam.position[2] <= 0:
+        acceleration = 0
+        cam.position[2] = 0
+
+def launchPlayer(cam, force):
+    global AIRRESISTANCE
+    if np.linalg.norm(force) > 0:
+        cam.position += force
+        force -= AIRRESISTANCE
+
 
 if __name__ == '__main__':
     run()

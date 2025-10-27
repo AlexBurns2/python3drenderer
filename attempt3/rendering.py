@@ -31,12 +31,13 @@ class Renderer:
         M = np.stack([right, forward, up], axis=1)
         return pts.dot(M)
     
-    def backface_cull(self, tri_cam):
+    def backface_cull(self, tri_cam, cam):
         v0, v1, v2 = tri_cam
         e1 = v1 - v0
         e2 = v2 - v0
         n = np.cross(e1, e2)
-        return n[1] <= 0, n
+        dotProd = np.dot(n, cam-(v0+v1+v2)/3)
+        return dotProd >= 0, n
     
     def project_point(self, v):
         if v[1] <= 0:
@@ -52,7 +53,6 @@ class Renderer:
         intensity = max(0.0, np.dot(n, -self.light_dir_world))
         base = 20
         g = int(base + 235 * intensity)
-        print(g, flush=True)
         return (g, 0, 0)
     
     def rasterize_numpy(self, frame, p2, depths, color):
@@ -107,7 +107,7 @@ class Renderer:
                 v2 = verts_cam[t[2]]
                 if v0[1] <= self.near and v1[1] <= self.near and v2[1] <= self.near:
                     continue
-                visible, _ = self.backface_cull((v0, v1, v2))
+                visible, _ = self.backface_cull((v0, v1, v2), cam_pos)
                 if not visible:
                     continue
                 try:
@@ -119,4 +119,3 @@ class Renderer:
                 depths = np.array([v0[1], v1[1], v2[1]], dtype=np.float32)
                 color = self.shade_triangle(normals[i])
                 self.rasterize_numpy(frame, (p0, p1, p2), depths, color)
-                print(color)
