@@ -63,7 +63,7 @@ def mouse_cb(event, x, y, flags, param):
     if cam.pitch < -89.9:
         cam.pitch = -89.9
     mouse_prev = (x, y)
-
+'''
 def on_press(key):
     try:
         if key.char == ('w'):
@@ -91,11 +91,11 @@ def on_release(key):
     if key == keyboard.Key.esc:
         # Stop listener
         return False
-
+'''
 
 def run():
-    with Listener(on_press=on_press, on_release=on_release) as listener:
-        listener.join()
+    #with Listener(on_press=on_press, on_release=on_release) as listener:
+    #    listener.join()
     
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
@@ -123,12 +123,13 @@ def run():
         speed = MOVE_SPEED * dt
         fwd = cam.forward()
         rgt = cam.right()
+        '''
         if w == True: cam.position += fwd * speed
         if a == True: cam.position -= rgt * speed
         if s == True: cam.position -= fwd * speed
         if d == True: cam.position += rgt * speed
-        
         '''
+        
         if key == ord('w'):
             cam.position += fwd * speed
         if key == ord('s'):
@@ -137,7 +138,7 @@ def run():
             cam.position -= rgt * speed
         if key == ord('d'):
             cam.position += rgt * speed
-        '''
+        
         if key == ord(' '):
             if cam.position[2] <= 0: launchPlayer(cam, np.array([0.0, 0.0, 2]))
         if key == ord('c'):
