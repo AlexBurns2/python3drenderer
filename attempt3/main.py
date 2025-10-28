@@ -4,8 +4,7 @@ import time
 from rendering import Renderer
 from objects import scan_stl_folder, load_scene_from_facets, scene_facets_raw
 import os
-from pynput import keyboard
-from pynput.keyboard import Listener
+import keyboard
 
 WIDTH = 600
 HEIGHT = 400
@@ -18,7 +17,6 @@ STL_FOLDER = 'stl_models'
 GRAVITY = 0.2
 AIRRESISTANCE = 0.1
 
-w,a,s,d = False, False, False, False
 
 class Camera:
     def __init__(self, pos, yaw=0.0, pitch=0.0):
@@ -63,35 +61,6 @@ def mouse_cb(event, x, y, flags, param):
     if cam.pitch < -89.9:
         cam.pitch = -89.9
     mouse_prev = (x, y)
-'''
-def on_press(key):
-    try:
-        if key.char == ('w'):
-            w = True
-        if key.char == ('a'):
-            a = True
-        if key.char == ('s'):
-            s = True
-        if key.char == ('d'):
-            d = True
-
-    except AttributeError:
-        print('special key {0} pressed'.format(
-            key))
-
-def on_release(key):
-    if key.char == ('w'):
-        w = False
-    if key.char == ('a'):
-        a = False
-    if key.char == ('s'):
-        s = False
-    if key.char == ('d'):
-        d = False
-    if key == keyboard.Key.esc:
-        # Stop listener
-        return False
-'''
 
 def run():
     #with Listener(on_press=on_press, on_release=on_release) as listener:
@@ -106,6 +75,7 @@ def run():
     cv2.resizeWindow('3D', WIDTH, HEIGHT)
     cv2.setMouseCallback('3D', mouse_cb, cam)
     last = time.time()
+    last_time = time.time()
     frame_time_target = 1.0 / MAX_FPS if MAX_FPS > 0 else 0.0
     while True:
         frame_start = time.time()
@@ -114,6 +84,9 @@ def run():
         last = now
         frame = renderer.clear()
         renderer.render_scene(frame, meshes, cam)
+        fps = 1.0 / max(1e-6, (time.time() - last_time))
+        last_time = time.time()
+        cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow('3D', frame)
         key = cv2.waitKey(1) & 0xFF
         if key == 27:
@@ -123,20 +96,14 @@ def run():
         speed = MOVE_SPEED * dt
         fwd = cam.forward()
         rgt = cam.right()
-        '''
-        if w == True: cam.position += fwd * speed
-        if a == True: cam.position -= rgt * speed
-        if s == True: cam.position -= fwd * speed
-        if d == True: cam.position += rgt * speed
-        '''
         
-        if key == ord('w'):
+        if keyboard.is_pressed('w'):
             cam.position += fwd * speed
-        if key == ord('s'):
+        if keyboard.is_pressed('s'):
             cam.position -= fwd * speed
-        if key == ord('a'):
+        if keyboard.is_pressed('a'):
             cam.position -= rgt * speed
-        if key == ord('d'):
+        if keyboard.is_pressed('d'):
             cam.position += rgt * speed
         
         if key == ord(' '):
@@ -165,7 +132,6 @@ def launchPlayer(cam, force):
     if np.linalg.norm(force) > 0:
         cam.position += force
         force -= AIRRESISTANCE
-
 
 if __name__ == '__main__':
     run()
