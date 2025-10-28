@@ -6,17 +6,22 @@ from objects import scan_stl_folder, load_scene_from_facets, scene_facets_raw
 import os
 import keyboard
 
-WIDTH = 600
-HEIGHT = 400
+WIDTH = 1920
+HEIGHT = 1080
 FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
-MOVE_SPEED = 1
-MAX_FPS = 0
+MOVE_SPEED = 6
+MAX_FPS = 60
 STL_FOLDER = 'stl_models'
 GRAVITY = 0.2
 AIRRESISTANCE = 0.1
 
+class Player:
+    def __init__(self, pos, force, cam):
+        self.position = np.array(pos, dtype=float)
+        self.force = np.array(force, dtype=float)
+        self.cam = cam
 
 class Camera:
     def __init__(self, pos, yaw=0.0, pitch=0.0):
@@ -67,6 +72,7 @@ def run():
     #    listener.join()
     
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
+    player = Player([0.0, -4.0, 1.2], [0.0, 0.0, 0.0], cam)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     scanned = scan_stl_folder(STL_FOLDER)
     facets_all = scene_facets_raw + scanned
@@ -86,6 +92,21 @@ def run():
         renderer.render_scene(frame, meshes, cam)
         fps = 1.0 / max(1e-6, (time.time() - last_time))
         last_time = time.time()
+        
+        speed = MOVE_SPEED * dt
+        fwd = cam.forward()
+        rgt = cam.right()
+        
+        if keyboard.is_pressed('w'):
+            player.position += fwd * speed
+        if keyboard.is_pressed('s'):
+            player.position -= fwd * speed
+        if keyboard.is_pressed('a'):
+            player.position -= rgt * speed
+        if keyboard.is_pressed('d'):
+            player.position += rgt * speed
+        
+        player.cam.position = player.position.copy()
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow('3D', frame)
         key = cv2.waitKey(1) & 0xFF
@@ -93,44 +114,34 @@ def run():
             break
         if key == ord('m'):
             toggle_mouse_lock()
-        speed = MOVE_SPEED * dt
-        fwd = cam.forward()
-        rgt = cam.right()
-        
-        if keyboard.is_pressed('w'):
-            cam.position += fwd * speed
-        if keyboard.is_pressed('s'):
-            cam.position -= fwd * speed
-        if keyboard.is_pressed('a'):
-            cam.position -= rgt * speed
-        if keyboard.is_pressed('d'):
-            cam.position += rgt * speed
-        
-        if key == ord(' '):
-            if cam.position[2] <= 0: launchPlayer(cam, np.array([0.0, 0.0, 2]))
-        if key == ord('c'):
-            cam.position -= np.array([0.0, 0.0, speed])
-        gravity(cam)
+
         frame_end = time.time()
         elapsed = frame_end - frame_start
+
+        if keyboard.is_pressed(' '):
+            if player.position[2] <= 0: launchPlayer(player, np.array([0.0, 0.0, 2]))
+        if keyboard.is_pressed('c'):
+            player.position -= np.array([0.0, 0.0, speed])
+        gravity(cam)
+
         if frame_time_target > 0 and elapsed < frame_time_target:
             time.sleep(frame_time_target - elapsed)
     cv2.destroyAllWindows()
 
-def gravity(cam):
+def gravity(player):
     global GRAVITY
     acceleration = 0
-    if cam.position[2] > 0:
+    if player.position[2] > 0:
         acceleration += GRAVITY
-        cam.position -= np.array([0.0, 0.0, acceleration])
-    if cam.position[2] <= 0:
+        player.position -= np.array([0.0, 0.0, acceleration])
+    if player.position[2] <= 0:
         acceleration = 0
-        cam.position[2] = 0
+        player.position[2] = 0
 
-def launchPlayer(cam, force):
+def launchPlayer(player, force):
     global AIRRESISTANCE
     if np.linalg.norm(force) > 0:
-        cam.position += force
+        player.position += force
         force -= AIRRESISTANCE
 
 if __name__ == '__main__':
