@@ -1,4 +1,6 @@
 import numpy as np
+from numba import jit
+
 
 class Renderer:
     def __init__(self, width, height, fov_degrees, near_clip):

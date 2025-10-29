@@ -6,8 +6,8 @@ from objects import scan_stl_folder, load_scene_from_facets, scene_facets_raw
 import os
 import keyboard
 
-WIDTH = 1920
-HEIGHT = 1080
+WIDTH = 960
+HEIGHT = 540
 FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
@@ -130,14 +130,13 @@ def run():
 
 def gravity(player):
     global GRAVITY
-    acceleration = 0
+    acceleration = {}
     if player.position[2] > 0:
         acceleration += GRAVITY
         player.position -= np.array([0.0, 0.0, acceleration])
     if player.position[2] <= 0:
         acceleration = 0
         player.position[2] = 0
-
 def launchPlayer(player, force):
     global AIRRESISTANCE
     if np.linalg.norm(force) > 0:
