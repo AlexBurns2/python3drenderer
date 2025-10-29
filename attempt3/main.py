@@ -18,9 +18,10 @@ GRAVITY = 0.2
 AIRRESISTANCE = 0.1
 
 class Player:
-    def __init__(self, pos, force, cam):
+    def __init__(self, pos, force, mass, cam):
         self.position = np.array(pos, dtype=float)
         self.force = np.array(force, dtype=float)
+        self.mass = mass
         self.cam = cam
 
 class Camera:
@@ -68,11 +69,8 @@ def mouse_cb(event, x, y, flags, param):
     mouse_prev = (x, y)
 
 def run():
-    #with Listener(on_press=on_press, on_release=on_release) as listener:
-    #    listener.join()
-    
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
-    player = Player([0.0, -4.0, 1.2], [0.0, 0.0, 0.0], cam)
+    player = Player([0.0, -4.0, 1.2], [0.0, 0.0, 0.0], 1, cam)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     scanned = scan_stl_folder(STL_FOLDER)
     facets_all = scene_facets_raw + scanned
@@ -122,21 +120,22 @@ def run():
             if player.position[2] <= 0: launchPlayer(player, np.array([0.0, 0.0, 2]))
         if keyboard.is_pressed('c'):
             player.position -= np.array([0.0, 0.0, speed])
-        gravity(cam)
+        gravity(player, elapsed)
 
         if frame_time_target > 0 and elapsed < frame_time_target:
             time.sleep(frame_time_target - elapsed)
     cv2.destroyAllWindows()
 
-def gravity(player):
+def gravity(player, dtime):
     global GRAVITY
-    acceleration = {}
+    acceleration = player.force * player.mass
     if player.position[2] > 0:
-        acceleration += GRAVITY
-        player.position -= np.array([0.0, 0.0, acceleration])
+        force = np.array([0.0, 0.0, gravity])
+        player.position -= acceleration * dtime
     if player.position[2] <= 0:
         acceleration = 0
         player.position[2] = 0
+
 def launchPlayer(player, force):
     global AIRRESISTANCE
     if np.linalg.norm(force) > 0:

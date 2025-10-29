@@ -1,5 +1,29 @@
 import numpy as np
-from numba import jit
+from numba import njit
+
+@njit(cache = True, fastmath = True)
+def world_to_camera(points, cam_pos, cam_yaw, cam_pitch):
+        pts = points - cam_pos
+        y = np.radians(cam_yaw)
+        p = np.radians(cam_pitch)
+        cy, sy = np.cos(y), np.sin(y)
+        cp, sp = np.cos(p), np.sin(p)
+        forward = np.array([np.sin(y) * cp, np.cos(y) * cp, sp])
+        right = np.cross(forward, np.array([0.0, 0.0, 1.0]))
+        right /= np.linalg.norm(right) if np.linalg.norm(right) != 0 else 1.0
+        up = np.cross(right, forward)
+        M = np.stack((right, forward, up), axis=1)
+        return pts.dot(M)
+
+@njit(cache = True, fastmath = True)
+def backface_cull(tri_cam, cam_pos):
+        v0, v1, v2 = tri_cam
+        e1 = v1 - v0
+        e2 = v2 - v0
+        n = np.cross(e1, e2)
+        #camtopoint = (((v0[0]+v1[0]+v2[0])/3) - cam_pos, ((v0[1]+v1[1]+v2[1])/3) - cam_pos, ((v0[2]+v1[2]+v2[2])/3) - cam_pos)
+        dotProd = np.dot(n, (v0+v1+v2)/3 - cam_pos)
+        return dotProd <= 0, n
 
 
 class Renderer:
@@ -19,27 +43,6 @@ class Renderer:
     def clear(self):
         self.zbuffer.fill(np.inf)
         return np.zeros((self.height, self.width, 3), dtype=np.uint8)
-    
-    def world_to_camera(self, points, cam_pos, cam_yaw, cam_pitch):
-        pts = points - cam_pos
-        y = np.radians(cam_yaw)
-        p = np.radians(cam_pitch)
-        cy, sy = np.cos(y), np.sin(y)
-        cp, sp = np.cos(p), np.sin(p)
-        forward = np.array([np.sin(y) * cp, np.cos(y) * cp, sp])
-        right = np.cross(forward, np.array([0.0, 0.0, 1.0]))
-        right /= np.linalg.norm(right) if np.linalg.norm(right) != 0 else 1.0
-        up = np.cross(right, forward)
-        M = np.stack([right, forward, up], axis=1)
-        return pts.dot(M)
-    
-    def backface_cull(self, tri_cam, cam):
-        v0, v1, v2 = tri_cam
-        e1 = v1 - v0
-        e2 = v2 - v0
-        n = np.cross(e1, e2)
-        dotProd = np.dot(n, cam-(v0+v1+v2)/3)
-        return dotProd >= 0, n
     
     def project_point(self, v):
         if v[1] <= 0:
@@ -102,14 +105,14 @@ class Renderer:
             verts = mesh['verts_world']
             tris = mesh['tris']
             normals = mesh['tri_normals_world']
-            verts_cam = self.world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
+            verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
             for i, t in enumerate(tris):
                 v0 = verts_cam[t[0]]
                 v1 = verts_cam[t[1]]
                 v2 = verts_cam[t[2]]
                 if v0[1] <= self.near and v1[1] <= self.near and v2[1] <= self.near:
                     continue
-                visible, _ = self.backface_cull((v0, v1, v2), cam_pos)
+                visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), cam_pos)
                 if not visible:
                     continue
                 try:
