@@ -2,7 +2,7 @@ import numpy as np
 import ctypes
 import cv2
 import time
-from rendering import Renderer
+from rendering import Renderer, render_scene
 from objects import (
     scan_obj_folder,
     load_scene_from_obj,
@@ -105,7 +105,17 @@ def run():
         last = now
         frame = renderer.clear()
         meshes = get_loaded_meshes()
-        renderer.render_scene(frame, meshes, cam)
+        render_scene(WIDTH, 
+                     HEIGHT, 
+                     renderer.focal, 
+                     renderer.near, 
+                     renderer.shader_cache, 
+                     renderer.zbuffer, 
+                     frame, 
+                     meshes_verts_world=[mesh['verts_world'] for mesh in meshes], 
+                     meshes_tris=[mesh['tris'] for mesh in meshes],
+                     meshes_tri_normals_world=[mesh['tri_normals_world'] for mesh in meshes], 
+                     cam.position, cam.yaw, cam.pitch)
         fps = 1.0 / max(1e-6, (time.time() - last_time))
         last_time = time.time()
         

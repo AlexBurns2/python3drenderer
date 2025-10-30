@@ -79,6 +79,52 @@ def rasterize_numpy(width, height, zbuffer, frame, p2, depths, color):
                     frame[y, x, 1] = color[1]
                     frame[y, x, 2] = color[2]
 
+
+from numba import njit
+import numpy as np
+
+@njit(cache=True, fastmath=True)
+def render_scene(render_width, render_height, focal, near, 
+                 shader_cache, zbuffer, frame,
+                 meshes_verts_world, meshes_tris, meshes_tri_normals_world,
+                 cam_pos, cam_yaw, cam_pitch):
+
+    for mesh_idx in range(len(meshes_verts_world)):
+        verts = meshes_verts_world[mesh_idx]
+        tris = meshes_tris[mesh_idx]
+        normals = meshes_tri_normals_world[mesh_idx]
+
+        # transform to cam space
+        verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
+
+        for tri_idx in range(len(tris)):
+            t = tris[tri_idx]
+            v0 = verts_cam[t[0]]
+            v1 = verts_cam[t[1]]
+            v2 = verts_cam[t[2]]
+
+            if v0[1] <= near and v1[1] <= near and v2[1] <= near:
+                continue
+
+            visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), cam_pos)
+            if not visible:
+                continue
+
+            # Project to screen
+            p0 = project_point(focal, render_width, render_height, v0)
+            p1 = project_point(focal, render_width, render_height, v1)
+            p2 = project_point(focal, render_width, render_height, v2)
+
+            depths = np.empty(3, dtype=np.float32)
+            depths[0] = v0[1]
+            depths[1] = v1[1]
+            depths[2] = v2[1]
+
+            color = shader_cache[tri_idx]
+            rasterize_numpy(render_width, render_height, zbuffer, frame,
+                            (p0, p1, p2), depths, color)
+
+
 class Renderer:
     def __init__(self, width, height, fov_degrees, near_clip):
         self.width = int(width)
@@ -114,7 +160,7 @@ class Renderer:
         intensity = max(0.0, np.dot(n, -self.light_dir_world))
         shaded = np.clip(np.array(base_color) * (0.2 + 0.8 * intensity), 0, 1)
         return (int(shaded[0]*255), int(shaded[1]*255), int(shaded[2]*255))
-
+'''
     def render_scene(self, frame, meshes, cam):
         cam_pos = cam.position
         cam_yaw = cam.yaw
@@ -141,4 +187,4 @@ class Renderer:
                     continue
                 depths = np.array([v0[1], v1[1], v2[1]], dtype=np.float32)
                 color = self.shader_cache[i]
-                rasterize_numpy(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
+                rasterize_numpy(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)'''
