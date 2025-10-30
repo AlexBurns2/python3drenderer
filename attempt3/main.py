@@ -1,9 +1,9 @@
 import numpy as np
+import ctypes
 import cv2
 import time
 from rendering import Renderer
-from objects import scan_stl_folder, load_scene_from_facets, scene_facets_raw
-import os
+from objects import scan_obj_folder, load_scene_from_obj, scene_facets_raw, toggle_object, translate_object, rotate_object
 import keyboard
 import sys
 
@@ -13,10 +13,10 @@ FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
 MOVE_SPEED = 2
-MAX_FPS = 0
-STL_FOLDER = 'stl_models'
+MAX_FPS = 144
+OBJ_FOLDER = 'obj_models'
 GRAVITY = -20
-AIRRESISTANCE = 0.1
+AIRRESISTANCE = 0.01
 
 class Player:
     def __init__(self, pos, velocity, mass, cam, grounded = True):
@@ -74,9 +74,14 @@ def run():
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
     player = Player([0.0, -4.0, 1.2], [0.0, 0.0, 0.0], 1, cam)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
-    scanned = scan_stl_folder(STL_FOLDER)
-    facets_all = scene_facets_raw + scanned
-    meshes = load_scene_from_facets(facets_all)
+
+    scanned = scan_obj_folder(OBJ_FOLDER)
+    meshes = load_scene_from_obj(scanned)
+
+    #rotate_object("monkey", rx=90)
+    #rotate_object("monkey", rx=0, ry=0, rz=np.pi)
+
+
     renderer.init_shader_cache([tri for mesh in meshes for tri in mesh['tris']])
     renderer.update_shader_cache(meshes)
     cv2.namedWindow('3D', cv2.WINDOW_NORMAL)

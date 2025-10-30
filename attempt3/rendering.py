@@ -99,18 +99,21 @@ class Renderer:
 
     def update_shader_cache(self, meshes):
         cache = self.shader_cache
+        offset = 0
         for mesh in meshes:
             tris = mesh['tris']
             normals = mesh['tri_normals_world']
+            colors = mesh.get('colors', None)
             for i, t in enumerate(tris):
-                cache[tris.index(t)] = self.shade_triangle(normals[i])
+                base_col = colors[i] if colors is not None else (1.0, 1.0, 1.0)
+                cache[offset + i] = self.shade_triangle(normals[i], base_col)
+        offset += len(tris)
     
-    def shade_triangle(self, normal_world):
+    def shade_triangle(self, normal_world, base_color=(1.0, 1.0, 1.0)):
         n = normalize(normal_world)
         intensity = max(0.0, np.dot(n, -self.light_dir_world))
-        base = 20
-        g = int(base + 235 * intensity)
-        return (g, 0, 0)
+        shaded = np.clip(np.array(base_color) * (0.2 + 0.8 * intensity), 0, 1)
+        return (int(shaded[0]*255), int(shaded[1]*255), int(shaded[2]*255))
 
     def render_scene(self, frame, meshes, cam):
         cam_pos = cam.position
