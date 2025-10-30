@@ -48,7 +48,6 @@ sun_pitch = 60.0 # degrees elevation (-90..90). default near noon
 fov_deg = FOV_DEGREES
 sensitivity = MOUSE_SENSITIVITY
 
-# ---------- utility ----------
 def normalize(v):
     n = np.linalg.norm(v, axis=-1, keepdims=True)
     n[n == 0] = 1.0
@@ -60,15 +59,7 @@ def lerp(a, b, t):
 def clamp(x, a, b):
     return max(a, min(b, x))
 
-# ---------- main generator ----------
 def generate_sky(width, height, fov_deg, pitch_deg, yaw_deg, sun_yaw_deg, sun_pitch_deg):
-    """
-    Render sky with:
-      - Correct camera rotation (pitch applied first, then yaw)
-      - Flat ground plane (grey/brown/black depending on time)
-      - Sun disc (angular falloff, circular)
-      - Day/night color mapping: night->sunrise->noon->sunset->night
-    """
 
     # Convert to radians & constants
     pitch = math.radians(pitch_deg)
@@ -209,7 +200,6 @@ def generate_sky(width, height, fov_deg, pitch_deg, yaw_deg, sun_yaw_deg, sun_pi
     img = np.clip(img, 0, 255).astype(np.uint8)
     return img
 
-# ---------- input handlers ----------
 def mouse_callback(event, x, y, flags, param):
     global dragging, last_x, last_y, yaw, pitch, sensitivity
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -225,13 +215,10 @@ def mouse_callback(event, x, y, flags, param):
     elif event == cv2.EVENT_LBUTTONUP:
         dragging = False
 
-# ---------- run window ----------
 if __name__ == "__main__":
-    cv2.namedWindow("Unity-like Procedural Sky", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Unity-like Procedural Sky", WIDTH, HEIGHT)
-    cv2.setMouseCallback("Unity-like Procedural Sky", mouse_callback)
-
-    print("Controls: drag = look, A/D = sun left/right, W/S = sun up/down, [,] = FOV, +/- = sensitivity, Q/Esc = quit")
+    cv2.namedWindow("Procedural Sky", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Procedural Sky", WIDTH, HEIGHT)
+    cv2.setMouseCallback("Procedural Sky", mouse_callback)
 
     while True:
         frame = generate_sky(WIDTH, HEIGHT, fov_deg, pitch, yaw, sun_yaw, sun_pitch)

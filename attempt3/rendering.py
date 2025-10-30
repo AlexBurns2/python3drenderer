@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit
+from numba import njit, cuda
 
 @njit(cache = True, fastmath = True)
 def world_to_camera(points, cam_pos, cam_yaw, cam_pitch):
@@ -30,6 +30,55 @@ def normalize(v):
     n = np.linalg.norm(v)
     return v / n if n != 0 else v
 
+@njit(cache = True, fastmath = True)
+def project_point(focal, width, height, v):
+        if v[1] <= 0:
+            raise ValueError
+        x = (v[0] * focal) / v[1]
+        z = (v[2] * focal) / v[1]
+        sx = int(width * 0.5 + x)
+        sy = int(height * 0.5 - z)
+        return sx, sy
+
+
+@njit(cache=True, fastmath=True)
+def rasterize_numpy(width, height, zbuffer, frame, p2, depths, color):
+    xs = np.empty(3, dtype=np.int32)
+    ys = np.empty(3, dtype=np.int32)
+    for i in range(3):
+        xs[i] = p2[i][0]
+        ys[i] = p2[i][1]
+
+    minx = max(min(xs[0], xs[1], xs[2], width - 1), 0)
+    maxx = min(max(xs[0], xs[1], xs[2], 0), width - 1)
+    miny = max(min(ys[0], ys[1], ys[2], height - 1), 0)
+    maxy = min(max(ys[0], ys[1], ys[2], 0), height - 1)
+
+    if minx > maxx or miny > maxy:
+        return
+
+    x0, y0 = xs[0], ys[0]
+    x1, y1 = xs[1], ys[1]
+    x2, y2 = xs[2], ys[2]
+
+    denom = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+    if denom == 0:
+        return
+
+    for y in range(miny, maxy + 1):
+        for x in range(minx, maxx + 1):
+            w0 = ((y1 - y2) * (x - x2) + (x2 - x1) * (y - y2)) / denom
+            w1 = ((y2 - y0) * (x - x2) + (x0 - x2) * (y - y2)) / denom
+            w2 = 1.0 - w0 - w1
+
+            if w0 >= 0 and w1 >= 0 and w2 >= 0:
+                depth = w0 * depths[0] + w1 * depths[1] + w2 * depths[2]
+                if depth < zbuffer[y, x]:
+                    zbuffer[y, x] = depth
+                    frame[y, x, 0] = color[0]
+                    frame[y, x, 1] = color[1]
+                    frame[y, x, 2] = color[2]
+
 class Renderer:
     def __init__(self, width, height, fov_degrees, near_clip):
         self.width = int(width)
@@ -58,58 +107,12 @@ class Renderer:
             for i, t in enumerate(tris):
                 cache[tris.index(t)] = self.shade_triangle(normals[i])
     
-    def project_point(self, v):
-        if v[1] <= 0:
-            raise ValueError
-        x = (v[0] * self.focal) / v[1]
-        z = (v[2] * self.focal) / v[1]
-        sx = int(self.width * 0.5 + x)
-        sy = int(self.height * 0.5 - z)
-        return sx, sy
-    
     def shade_triangle(self, normal_world):
         n = normalize(normal_world)
         intensity = max(0.0, np.dot(n, -self.light_dir_world))
         base = 20
         g = int(base + 235 * intensity)
         return (g, 0, 0)
-    
-    def rasterize_numpy(self, frame, p2, depths, color):
-        xs = np.array([p2[0][0], p2[1][0], p2[2][0]])
-        ys = np.array([p2[0][1], p2[1][1], p2[2][1]])
-        minx = max(int(np.clip(xs.min(), 0, self.width - 1)), 0)
-        maxx = min(int(np.clip(xs.max(), 0, self.width - 1)), self.width - 1)
-        miny = max(int(np.clip(ys.min(), 0, self.height - 1)), 0)
-        maxy = min(int(np.clip(ys.max(), 0, self.height - 1)), self.height - 1)
-        if minx > maxx or miny > maxy:
-            return
-        px = np.arange(minx, maxx + 1)
-        py = np.arange(miny, maxy + 1)
-        gx, gy = np.meshgrid(px, py)
-        x0, y0 = xs[0], ys[0]
-        x1, y1 = xs[1], ys[1]
-        x2, y2 = xs[2], ys[2]
-        denom = (y1 - y2)*(x0 - x2) + (x2 - x1)*(y0 - y2)
-        if denom == 0:
-            return
-        w0 = ((y1 - y2)*(gx - x2) + (x2 - x1)*(gy - y2)) / denom
-        w1 = ((y2 - y0)*(gx - x2) + (x0 - x2)*(gy - y2)) / denom
-        w2 = 1.0 - w0 - w1
-        mask = (w0 >= 0) & (w1 >= 0) & (w2 >= 0)
-        if not np.any(mask):
-            return
-        depth_map = w0 * depths[0] + w1 * depths[1] + w2 * depths[2]
-        gy_mask = gy[mask].astype(int)
-        gx_mask = gx[mask].astype(int)
-        zbuf_vals = self.zbuffer[gy_mask, gx_mask]
-        depth_sub = depth_map[mask]
-        replace = depth_sub < zbuf_vals
-        if not np.any(replace):
-            return
-        write_y = gy_mask[replace]
-        write_x = gx_mask[replace]
-        self.zbuffer[write_y, write_x] = depth_sub[replace]
-        frame[write_y, write_x] = color
 
     def render_scene(self, frame, meshes, cam):
         cam_pos = cam.position
@@ -130,11 +133,11 @@ class Renderer:
                 if not visible:
                     continue
                 try:
-                    p0 = self.project_point(v0)
-                    p1 = self.project_point(v1)
-                    p2 = self.project_point(v2)
+                    p0 = project_point(self.focal, self.width, self.height, v0)
+                    p1 = project_point(self.focal, self.width, self.height, v1)
+                    p2 = project_point(self.focal, self.width, self.height, v2)
                 except Exception:
                     continue
                 depths = np.array([v0[1], v1[1], v2[1]], dtype=np.float32)
                 color = self.shader_cache[i]
-                self.rasterize_numpy(frame, (p0, p1, p2), depths, color)
+                rasterize_numpy(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
