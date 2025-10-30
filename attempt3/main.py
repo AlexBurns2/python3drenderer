@@ -3,9 +3,19 @@ import ctypes
 import cv2
 import time
 from rendering import Renderer
-from objects import scan_obj_folder, load_scene_from_obj, scene_facets_raw, toggle_object, translate_object, rotate_object
+from objects import (
+    scan_obj_folder,
+    load_scene_from_obj,
+    get_loaded_meshes,
+    scene_facets_raw,
+    toggle_object,
+    translate_object,
+    rotate_object,
+    keep_transformed_file
+)
 import keyboard
 import sys
+import atexit
 
 WIDTH = 960
 HEIGHT = 540
@@ -76,11 +86,9 @@ def run():
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
 
     scanned = scan_obj_folder(OBJ_FOLDER)
-    meshes = load_scene_from_obj(scanned)
+    load_scene_from_obj(scanned)
 
-    #rotate_object("monkey", rx=90)
-    #rotate_object("monkey", rx=0, ry=0, rz=np.pi)
-
+    meshes = get_loaded_meshes()
 
     renderer.init_shader_cache([tri for mesh in meshes for tri in mesh['tris']])
     renderer.update_shader_cache(meshes)
@@ -96,6 +104,7 @@ def run():
         dt = max(1e-6, now - last)
         last = now
         frame = renderer.clear()
+        meshes = get_loaded_meshes()
         renderer.render_scene(frame, meshes, cam)
         fps = 1.0 / max(1e-6, (time.time() - last_time))
         last_time = time.time()
@@ -112,6 +121,12 @@ def run():
             player.position -= rgt * speed
         if keyboard.is_pressed('d'):
             player.position += rgt * speed
+
+        if keyboard.is_pressed('up'):
+            rotate_object("monkey", rx=0.0, ry=1.0, rz=0.0)
+            print("Up arrow pressed!")
+        if keyboard.is_pressed('down'):
+            rotate_object("monkey", rx=0.0, ry=-1.0, rz=0.0)
         
         player.cam.position = player.position.copy()
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
