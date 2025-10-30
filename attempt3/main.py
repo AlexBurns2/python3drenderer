@@ -76,6 +76,8 @@ def run():
     scanned = scan_stl_folder(STL_FOLDER)
     facets_all = scene_facets_raw + scanned
     meshes = load_scene_from_facets(facets_all)
+    renderer.init_shader_cache([tri for mesh in meshes for tri in mesh['tris']])
+    renderer.update_shader_cache(meshes)
     cv2.namedWindow('3D', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('3D', WIDTH, HEIGHT)
     cv2.setMouseCallback('3D', mouse_cb, cam)
@@ -125,7 +127,7 @@ def run():
 
         if frame_time_target > 0 and elapsed < frame_time_target:
             time.sleep(frame_time_target - elapsed)
-    cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
     sys.exit()
 
 def gravity(player, dtime):

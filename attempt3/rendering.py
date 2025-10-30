@@ -25,6 +25,10 @@ def backface_cull(tri_cam, cam_pos):
         dotProd = np.dot(n, (v0+v1+v2)/3 - cam_pos)
         return dotProd <= 0, n
 
+@njit(cache = True, fastmath = True)
+def normalize(v):
+    n = np.linalg.norm(v)
+    return v / n if n != 0 else v
 
 class Renderer:
     def __init__(self, width, height, fov_degrees, near_clip):
@@ -34,15 +38,25 @@ class Renderer:
         self.near = float(near_clip)
         self.focal = 0.5 * self.width / np.tan(np.radians(self.fov) * 0.5)
         self.zbuffer = np.full((self.height, self.width), np.inf, dtype=np.float32)
-        self.light_dir_world = self._normalize(np.array([0.6, 0.7, -0.3], dtype=float))
+        self.shader_cache = []
+        self.light_dir_world = normalize(np.array([0.6, 0.7, -0.3], dtype=float))
 
-    def _normalize(self, v):
-        n = np.linalg.norm(v)
-        return v / n if n != 0 else v
-    
     def clear(self):
         self.zbuffer.fill(np.inf)
         return np.zeros((self.height, self.width, 3), dtype=np.uint8)
+    
+    def init_shader_cache(self, tris):
+        self.shader_cache = np.full((len(tris), 3), -1, dtype=np.int32)
+        print(self.shader_cache)
+        print(len(self.shader_cache))
+
+    def update_shader_cache(self, meshes):
+        cache = self.shader_cache
+        for mesh in meshes:
+            tris = mesh['tris']
+            normals = mesh['tri_normals_world']
+            for i, t in enumerate(tris):
+                cache[tris.index(t)] = self.shade_triangle(normals[i])
     
     def project_point(self, v):
         if v[1] <= 0:
@@ -54,7 +68,7 @@ class Renderer:
         return sx, sy
     
     def shade_triangle(self, normal_world):
-        n = self._normalize(normal_world)
+        n = normalize(normal_world)
         intensity = max(0.0, np.dot(n, -self.light_dir_world))
         base = 20
         g = int(base + 235 * intensity)
@@ -122,5 +136,5 @@ class Renderer:
                 except Exception:
                     continue
                 depths = np.array([v0[1], v1[1], v2[1]], dtype=np.float32)
-                color = self.shade_triangle(normals[i])
+                color = self.shader_cache[i]
                 self.rasterize_numpy(frame, (p0, p1, p2), depths, color)
