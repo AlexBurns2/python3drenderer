@@ -12,18 +12,19 @@ HEIGHT = 540
 FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
-MOVE_SPEED = 6
+MOVE_SPEED = 2
 MAX_FPS = 0
 STL_FOLDER = 'stl_models'
-GRAVITY = 0.2
+GRAVITY = -20
 AIRRESISTANCE = 0.1
 
 class Player:
-    def __init__(self, pos, force, mass, cam):
+    def __init__(self, pos, velocity, mass, cam, grounded = True):
         self.position = np.array(pos, dtype=float)
-        self.force = np.array(force, dtype=float)
+        self.velocity = np.array(velocity, dtype=float)
         self.mass = mass
         self.cam = cam
+        self.grounded = True
 
 class Camera:
     def __init__(self, pos, yaw=0.0, pitch=0.0):
@@ -120,31 +121,34 @@ def run():
         elapsed = frame_end - frame_start
 
         if keyboard.is_pressed(' '):
-            if player.position[2] <= 0: launchPlayer(player, np.array([0.0, 0.0, 2]))
+            launchPlayer(player, np.array([0.0, 0.0, 6]))
         if keyboard.is_pressed('c'):
             player.position -= np.array([0.0, 0.0, speed])
         gravity(player, elapsed)
 
+        elapsed = frame_end - frame_start
         if frame_time_target > 0 and elapsed < frame_time_target:
             time.sleep(frame_time_target - elapsed)
     #cv2.destroyAllWindows()
     sys.exit()
 
 def gravity(player, dtime):
-    global GRAVITY
-    acceleration = player.force * player.mass
-    if player.position[2] > 0:
-        force = np.array([0.0, 0.0, gravity])
-        player.position -= acceleration * dtime
+    global GRAVITY, AIRRESISTANCE
+    player.velocity[2] += GRAVITY * dtime
+    player.velocity[0] *= (1 - AIRRESISTANCE * dtime)
+    player.velocity[1] *= (1 - AIRRESISTANCE * dtime)
+    player.position += player.velocity * dtime
     if player.position[2] <= 0:
-        acceleration = 0
         player.position[2] = 0
+        player.velocity[2] = 0
+        player.on_ground = True
+    else:
+        player.on_ground = False
 
-def launchPlayer(player, force):
-    global AIRRESISTANCE
-    if np.linalg.norm(force) > 0:
-        player.position += force
-        force -= AIRRESISTANCE
+def launchPlayer(player, jump_force):
+    if player.on_ground:
+        player.velocity += jump_force
+        player.on_ground = False
 
 if __name__ == '__main__':
     run()

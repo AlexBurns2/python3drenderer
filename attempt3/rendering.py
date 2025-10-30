@@ -96,8 +96,6 @@ class Renderer:
     
     def init_shader_cache(self, tris):
         self.shader_cache = np.full((len(tris), 3), -1, dtype=np.int32)
-        print(self.shader_cache)
-        print(len(self.shader_cache))
 
     def update_shader_cache(self, meshes):
         cache = self.shader_cache
