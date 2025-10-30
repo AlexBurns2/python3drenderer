@@ -5,6 +5,7 @@ from rendering import Renderer
 from objects import scan_stl_folder, load_scene_from_facets, scene_facets_raw
 import os
 import keyboard
+import sys
 
 WIDTH = 960
 HEIGHT = 540
@@ -12,7 +13,7 @@ FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
 MOVE_SPEED = 6
-MAX_FPS = 60
+MAX_FPS = 0
 STL_FOLDER = 'stl_models'
 GRAVITY = 0.2
 AIRRESISTANCE = 0.1
@@ -125,6 +126,7 @@ def run():
         if frame_time_target > 0 and elapsed < frame_time_target:
             time.sleep(frame_time_target - elapsed)
     cv2.destroyAllWindows()
+    sys.exit()
 
 def gravity(player, dtime):
     global GRAVITY
