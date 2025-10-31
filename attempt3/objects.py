@@ -131,7 +131,6 @@ def scan_obj_folder(folder='obj_models'):
     for fn in sorted(os.listdir(folder)):
         if not fn.lower().endswith('.obj'):
             continue
-        # ignore intentionally hidden .hidden.obj
         if fn.lower().endswith('.hidden.obj'):
             continue
         obj_path = os.path.join(folder, fn)
@@ -201,7 +200,6 @@ def _azb_path(name, folder):
     return os.path.join(folder, base[:-4] + '.azb')
 
 def translate_object(name, dx, dy, dz, folder='obj_models'):
-    # update azb file first (if exists)
     azb = _azb_path(name, folder)
     if not os.path.exists(azb):
         return False
@@ -216,7 +214,6 @@ def translate_object(name, dx, dy, dz, folder='obj_models'):
             else:
                 f.write(line)
 
-    # Update in-memory mesh if loaded
     basename = os.path.splitext(name)[0]
     idx = _loaded_meshes_by_name.get(basename.lower())
     if idx is not None and 0 <= idx < len(_loaded_meshes):
@@ -239,7 +236,7 @@ def rotate_object(name, rx=0.0, ry=0.0, rz=0.0, degrees=True, folder='obj_models
     Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
     Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
     Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
-    R = Rx @ Ry @ Rz  # intrinsic Z->Y->X (applied as local axes)
+    R = Rx @ Ry @ Rz
 
     with open(azb, 'r') as f:
         lines = f.readlines()
