@@ -3,6 +3,7 @@ import ctypes
 import cv2
 import time
 from rendering import Renderer
+from colliders import load_colliders, check_collision
 from objects import (
     scan_obj_folder,
     load_scene_from_obj,
@@ -84,7 +85,7 @@ def run():
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
     player = Player([0.0, -4.0, 1.2], [0.0, 0.0, 0.0], 1, cam)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
-
+    load_colliders()
     scanned = scan_obj_folder(OBJ_FOLDER)
     load_scene_from_obj(scanned)
 
@@ -129,6 +130,8 @@ def run():
             rotate_object("monkey", rx=0.0, ry=-1.0, rz=0.0)
         
         player.cam.position = player.position.copy()
+        check_collision(player, height=1.8, radius=0.3)
+
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow('3D', frame)
         key = cv2.waitKey(1) & 0xFF
