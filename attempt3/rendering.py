@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit
 
+
 @njit(cache=True, fastmath=True)
 def world_to_camera(points, cam_pos, cam_yaw, cam_pitch):
     pts = points - cam_pos
@@ -126,6 +127,9 @@ class Renderer:
         self.zbuffer.fill(np.inf)
         return np.zeros((self.height, self.width, 3), dtype=np.uint8)
     
+    def skybox(self, frame, color=(100, 150, 255)):
+        frame[:, :] = color
+    
     def init_shader_cache(self, tris):
         n = len(tris)
         self.shader_colors = np.full((n, 3), 0, dtype=np.uint8)
@@ -151,6 +155,7 @@ class Renderer:
         return (int(shaded[0]*255), int(shaded[1]*255), int(shaded[2]*255)), 0.2 + 0.8 * intensity
 
     def render_scene(self, frame, meshes, cam):
+        self.skybox(frame)
         cam_pos = cam.position
         cam_yaw = cam.yaw
         cam_pitch = cam.pitch
