@@ -14,6 +14,7 @@ from objects import (
     rotate_object,
     keep_transformed_file
 )
+from fdobjects import *
 import keyboard
 import sys
 import atexit
@@ -90,6 +91,7 @@ def run():
     load_scene_from_obj(scanned)
 
     meshes = get_loaded_meshes()
+    meshes4d = get_loaded_4meshes()
 
     renderer.init_shader_cache([tri for mesh in meshes for tri in mesh['tris']])
     renderer.update_shader_cache(meshes)
@@ -106,7 +108,8 @@ def run():
         last = now
         frame = renderer.clear()
         meshes = get_loaded_meshes()
-        renderer.render_scene(frame, meshes, cam)
+        meshes4d = get_loaded_4meshes()
+        renderer.render_scene(frame, meshes, meshes4d, cam)
         fps = 1.0 / max(1e-6, (time.time() - last_time))
         last_time = time.time()
         

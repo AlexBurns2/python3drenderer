@@ -154,7 +154,7 @@ class Renderer:
         shaded = np.clip(np.array(base_color) * (0.2 + 0.8 * intensity), 0, 1)
         return (int(shaded[0]*255), int(shaded[1]*255), int(shaded[2]*255)), 0.2 + 0.8 * intensity
 
-    def render_scene(self, frame, meshes, cam):
+    def render_scene(self, frame, meshes, meshes4d, cam):
         self.skybox(frame)
         cam_pos = cam.position
         cam_yaw = cam.yaw
@@ -190,4 +190,30 @@ class Renderer:
                     rasterize_textured(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, uvs[i], texture, light)
                 else:
                     rasterize_color(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
+                tri_index += 1
+
+        for mesh in meshes4d:
+            verts = mesh['verts_world']
+            tris = mesh['tris']
+            verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
+            for i, t in enumerate(tris):
+                v0, v1, v2 = verts_cam[t[0]], verts_cam[t[1]], verts_cam[t[2]]
+                if v0[1] <= self.near and v1[1] <= self.near and v2[1] <= self.near:
+                    tri_index += 1
+                    continue
+                visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), cam_pos)
+                if not visible:
+                    tri_index += 1
+                    continue
+                try:
+                    p0 = project_point(self.focal, self.width, self.height, v0)
+                    p1 = project_point(self.focal, self.width, self.height, v1)
+                    p2 = project_point(self.focal, self.width, self.height, v2)
+                except Exception:
+                    tri_index += 1
+                    continue
+                depths = np.array([v0[1], v1[1], v2[1]], dtype=np.float32)
+                color = self.shader_colors[tri_index]
+                light = self.shader_lights[tri_index]
+                rasterize_color(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
                 tri_index += 1
