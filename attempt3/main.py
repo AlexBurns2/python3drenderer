@@ -89,6 +89,7 @@ def run():
     scanned = scan_obj_folder(OBJ_FOLDER)
     load_scene_from_obj(scanned)
 
+    
     opaque, transparent = get_loaded_meshes()
     print("opaque:", len(opaque), "transparent:", len(transparent))
     renderer.init_shader_cache([tri for mesh in (opaque+transparent) for tri in mesh['tris']])

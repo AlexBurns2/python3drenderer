@@ -39,14 +39,15 @@ cube2verts = np.c_[cube2verts, np.full(len(cube1verts), -1, dtype=int)]
 
 cube1tris = []
 for i, point in enumerate(cube1verts):
-    for j, test1 in enumerate(cube1verts):
-        if i<j and np.sum(np.abs(test1 - point)) == 2:
-            for k, test2 in enumerate(cube1verts):
-                if k<j and np.sum(np.abs(test2 - point)) == 2:
-                    cube1tris.append((i,j,k))
+    if i %2 == 0:
+        for j, test1 in enumerate(cube1verts):
+            if i<j and np.sum(np.abs(test1 - point)) == 2:
+                for k, test2 in enumerate(cube1verts):
+                    if k<j and np.sum(np.abs(test2 - point)) == 2:
+                        cube1tris.append((i,j,k))
 
 print(cube1tris)
-
+print(len(cube1tris))
 
 
 '''
