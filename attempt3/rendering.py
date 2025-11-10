@@ -19,6 +19,7 @@ def world_to_camera(points, cam_pos, cam_yaw, cam_pitch):
 @njit(cache=True, fastmath=True)
 def backface_cull(tri_cam, cam_pos):
     v0, v1, v2 = tri_cam
+    
     e1 = v1 - v0
     e2 = v2 - v0
     n = np.cross(e1, e2)
@@ -111,6 +112,36 @@ def rasterize_textured(width, height, zbuffer, frame, p2, depths, uvs, texture, 
                     frame[y, x, 1] = min(255, int(color[1] * light))
                     frame[y, x, 2] = min(255, int(color[2] * light))
 
+@njit(cache=True, fastmath=True)
+def rasterize_transparent(width, height, frame, p2, depths, color, alpha):
+    xs = np.empty(3, dtype=np.int32)
+    ys = np.empty(3, dtype=np.int32)
+    for i in range(3):
+        xs[i] = p2[i][0]
+        ys[i] = p2[i][1]
+    minx = max(min(xs[0], xs[1], xs[2]), 0)
+    maxx = min(max(xs[0], xs[1], xs[2]), width - 1)
+    miny = max(min(ys[0], ys[1], ys[2]), 0)
+    maxy = min(max(ys[0], ys[1], ys[2]), height - 1)
+    if minx > maxx or miny > maxy:
+        return
+    x0, y0 = xs[0], ys[0]
+    x1, y1 = xs[1], ys[1]
+    x2, y2 = xs[2], ys[2]
+    denom = (y1 - y2)*(x0 - x2) + (x2 - x1)*(y0 - y2)
+    if denom == 0:
+        return
+    for y in range(miny, maxy + 1):
+        for x in range(minx, maxx + 1):
+            w0 = ((y1 - y2)*(x - x2) + (x2 - x1)*(y - y2)) / denom
+            w1 = ((y2 - y0)*(x - x2) + (x0 - x2)*(y - y2)) / denom
+            w2 = 1.0 - w0 - w1
+            if w0 >= 0 and w1 >= 0 and w2 >= 0:
+                # Additive blend
+                frame[y, x, 0] = min(255, frame[y, x, 0] + color[0] * alpha)
+                frame[y, x, 1] = min(255, frame[y, x, 1] + color[1] * alpha)
+                frame[y, x, 2] = min(255, frame[y, x, 2] + color[2] * alpha)
+
 class Renderer:
     def __init__(self, width, height, fov_degrees, near_clip):
         self.width = int(width)
@@ -127,7 +158,7 @@ class Renderer:
         self.zbuffer.fill(np.inf)
         return np.zeros((self.height, self.width, 3), dtype=np.uint8)
     
-    def skybox(self, frame, color=(100, 150, 255)):
+    def skybox(self, frame, color=(0,0,0)):
         frame[:, :] = color
     
     def init_shader_cache(self, tris):
@@ -154,13 +185,13 @@ class Renderer:
         shaded = np.clip(np.array(base_color) * (0.2 + 0.8 * intensity), 0, 1)
         return (int(shaded[0]*255), int(shaded[1]*255), int(shaded[2]*255)), 0.2 + 0.8 * intensity
 
-    def render_scene(self, frame, meshes, cam):
+    def render_scene(self, frame, opaque_meshes, transparent_meshes, cam):
         self.skybox(frame)
         cam_pos = cam.position
         cam_yaw = cam.yaw
         cam_pitch = cam.pitch
         tri_index = 0
-        for mesh in meshes:
+        for mesh in opaque_meshes:
             verts = mesh['verts_world']
             tris = mesh['tris']
             normals = mesh['tri_normals_world']
@@ -191,3 +222,23 @@ class Renderer:
                 else:
                     rasterize_color(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
                 tri_index += 1
+
+        for mesh in transparent_meshes:
+            verts = mesh['verts_world']
+            tris = mesh['tris']
+            normals = mesh['tri_normals_world']
+            alphas = mesh['alpha']
+            colors = mesh.get('colors', None)
+
+            verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
+
+            for i, tri in enumerate(tris):
+                v = np.array([verts_cam[tri[0]], verts_cam[tri[1]], verts_cam[tri[2]]])
+                shaded, light = self.shade_triangle(normals[i], colors[i])
+                try:
+                    p2 = [project_point(self.focal, self.width, self.height, v[k]) for k in range(3)]
+                except:
+                    continue
+                depths = np.array([v[0][1], v[1][1], v[2][1]], dtype=np.float32)
+                alpha = alphas[i]
+                rasterize_transparent(self.width, self.height, frame, p2, depths, shaded, alpha)

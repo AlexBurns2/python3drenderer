@@ -14,7 +14,6 @@ from objects import (
     rotate_object,
     keep_transformed_file
 )
-from fdobjects import *
 import keyboard
 import sys
 import atexit
@@ -90,11 +89,10 @@ def run():
     scanned = scan_obj_folder(OBJ_FOLDER)
     load_scene_from_obj(scanned)
 
-    meshes = get_loaded_meshes()
-    meshes4d = get_loaded_4meshes()
-
-    renderer.init_shader_cache([tri for mesh in meshes for tri in mesh['tris']])
-    renderer.update_shader_cache(meshes)
+    opaque, transparent = get_loaded_meshes()
+    print("opaque:", len(opaque), "transparent:", len(transparent))
+    renderer.init_shader_cache([tri for mesh in (opaque+transparent) for tri in mesh['tris']])
+    renderer.update_shader_cache(opaque + transparent)
     cv2.namedWindow('3D', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('3D', WIDTH, HEIGHT)
     cv2.setMouseCallback('3D', mouse_cb, cam)
@@ -107,9 +105,8 @@ def run():
         dt = max(1e-6, now - last)
         last = now
         frame = renderer.clear()
-        meshes = get_loaded_meshes()
-        meshes4d = get_loaded_4meshes()
-        renderer.render_scene(frame, meshes, cam)
+        opaque, transparent = get_loaded_meshes()
+        renderer.render_scene(frame, opaque, transparent, cam)
         fps = 1.0 / max(1e-6, (time.time() - last_time))
         last_time = time.time()
         
