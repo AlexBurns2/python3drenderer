@@ -4,6 +4,7 @@ import cv2
 import shutil
 import math
 import atexit
+import sys
 
 scene_facets_raw = []
 
@@ -40,7 +41,7 @@ def parse_mtl(path):
                 continue
             if line.startswith('newmtl'):
                 current = line.split()[1]
-                materials[current] = {'Kd': (1.0, 1.0, 1.0), 'map_Kd': None}
+                materials[current] = {'Kd': (1.0, 1.0, 1.0), 'map_Kd': None, 'd': 1.0}
             elif current and line.startswith('Kd'):
                 parts = line.split()
                 kd = tuple(float(p) for p in parts[1:4])
@@ -50,6 +51,9 @@ def parse_mtl(path):
                 tex_name = line.split(maxsplit=1)[1].strip()
                 tex_path = os.path.join(folder, tex_name)
                 materials[current]['map_Kd'] = tex_path
+            elif current and line.startswith('d '):
+                parts = line.split()
+                materials[current]['d'] = float(parts[1])
     return materials
 
 def parse_obj(path):
@@ -114,7 +118,8 @@ def parse_obj(path):
         mat = materials.get(f['material'], {})
         col = mat.get('Kd', (1.0, 1.0, 1.0))
         tex = mat.get('map_Kd', None)
-        facets.append({'verts': v, 'uvs': uv, 'normal': n, 'color': col, 'texture': tex})
+        alpha = mat.get('d', 1.0)
+        facets.append({'verts': v, 'uvs': uv, 'normal': n, 'color': col, 'texture': tex, 'alpha': alpha})
     return facets
 
 def _make_azb_copy(obj_path):
@@ -143,17 +148,16 @@ def load_scene_from_obj(objects_with_facets):
     global _loaded_meshes, _loaded_meshes_by_name
     _loaded_meshes = []
     _loaded_meshes_by_name = {}
-
     for obj in objects_with_facets:
         facets = obj.get('facets') if 'facets' in obj else obj
         azb_path = obj.get('azb_path', None)
         basename = os.path.splitext(obj.get('name', 'unnamed'))[0]
-
         vert_map = {}
         verts = []
         tris = []
         tri_normals = []
         tri_colors = []
+        tri_alphas = []
         tri_uvs = []
         tex_path = None
 
@@ -168,6 +172,7 @@ def load_scene_from_obj(objects_with_facets):
             tris.append((idxs[0], idxs[1], idxs[2]))
             tri_normals.append(f['normal'])
             tri_colors.append(np.array(f['color'], dtype=float))
+            tri_alphas.append(float(f.get('alpha', 1.0)))
             tri_uvs.append(np.array(f['uvs'], dtype=float))
             if f['texture']:
                 tex_path = f['texture']
@@ -184,16 +189,28 @@ def load_scene_from_obj(objects_with_facets):
             'tris': tris,
             'tri_normals_world': np.array(tri_normals, dtype=float),
             'colors': np.array(tri_colors, dtype=float),
+            'alpha': np.array(tri_alphas, dtype=float),
             'uvs': tri_uvs,
             'texture': texture
         }
+        print(mesh)
         _loaded_meshes_by_name[basename.lower()] = len(_loaded_meshes)
         _loaded_meshes.append(mesh)
-
+        print(_loaded_meshes)
     return _loaded_meshes
+
+print(_loaded_meshes)
 
 def get_loaded_meshes():
-    return _loaded_meshes
+    opaque = []
+    transparent = []
+    #print("Total loaded meshes:", len(_loaded_meshes))
+    for m in _loaded_meshes:
+        if np.any(m['alpha'] < 1.0):
+            transparent.append(m)
+        else:
+            opaque.append(m)
+    return opaque, transparent
 
 def _azb_path(name, folder):
     base = f"{name}.obj" if not name.endswith('.obj') else name
