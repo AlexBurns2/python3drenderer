@@ -109,7 +109,7 @@ def run():
         frame = renderer.clear()
         meshes = get_loaded_meshes()
         meshes4d = get_loaded_4meshes()
-        renderer.render_scene(frame, meshes, meshes4d, cam)
+        renderer.render_scene(frame, meshes, cam)
         fps = 1.0 / max(1e-6, (time.time() - last_time))
         last_time = time.time()
         
