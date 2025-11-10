@@ -28,3 +28,30 @@ for i, point in enumerate(vertices):
 tris = np.array(tris)
 print(tris)
 print(len(tris))
+
+
+quads = []
+cube1verts = np.array(list(product([-1, 1], repeat=3)))
+cube2verts = np.array(list(product([-1, 1], repeat=3)))
+cube1verts = np.c_[cube1verts, np.ones(len(cube1verts))]
+print(cube1verts)
+cube2verts = np.c_[cube2verts, np.full(len(cube1verts), -1, dtype=int)]
+
+cube1tris = []
+for i, point in enumerate(cube1verts):
+    for j, test1 in enumerate(cube1verts):
+        if i<j and np.sum(np.abs(test1 - point)) == 2:
+            for k, test2 in enumerate(cube1verts):
+                if k<j and np.sum(np.abs(test2 - point)) == 2:
+                    cube1tris.append((i,j,k))
+
+print(cube1tris)
+
+
+
+'''
+[1, 1, 1, 1]
+[-1, 1, 1, 1]
+[-1, -1, 1, 1]
+[1, -1, 1, 1]
+'''
