@@ -1,5 +1,4 @@
-# Blender 4.2.2 LTS MTL File: 'None'
-# www.blender.org
+# alex burns 10CT 2025
 
 newmtl Material.001
 Ns 250.000000
@@ -28,5 +27,5 @@ Kd 0.017528 0.110689 0.000000
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
-d 0.500000
+d 1.000000
 illum 2
