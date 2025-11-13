@@ -17,7 +17,9 @@ from objects import (
 from fdobjects import (
     scan_fdo_folder,
     load_scene_from_fdo,
-    get_loaded_4meshes
+    get_loaded_4meshes,
+    rotate_object_4d,
+    define_cam
 )
 import keyboard
 import sys
@@ -89,6 +91,7 @@ def mouse_cb(event, x, y, flags, param):
 
 def run():
     cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
+    define_cam(cam)
     player = Player([0.0, -4.0, 1.2], [0.0, 0.0, 0.0], 1, cam)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     load_colliders()
@@ -96,31 +99,36 @@ def run():
     scanned4d = scan_fdo_folder(FDO_FOLDER)
     load_scene_from_obj(scanned)
     load_scene_from_fdo(scanned4d)
-
-    opaque, transparent = get_loaded_4meshes()
+    opaque = get_loaded_meshes()[0] + get_loaded_4meshes()[0]
+    transparent = get_loaded_meshes()[1] + get_loaded_4meshes()[1]
     #opaque = get_loaded_meshes()[0] + get_loaded_4meshes()[0]
     #transparent = get_loaded_meshes()[1] + get_loaded_4meshes()[1]
     print("opaque:", len(opaque), "transparent:", len(transparent))
-
     renderer.init_shader_cache([tri for mesh in (opaque+transparent) for tri in mesh['tris']])
     renderer.update_shader_cache(opaque + transparent)
+
+    for m in get_loaded_4meshes()[0]:
+        print(m['name'], "verts range", np.min(m['verts_world'], axis=0), np.max(m['verts_world'], axis=0))
+
     cv2.namedWindow('3D', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('3D', WIDTH, HEIGHT)
     cv2.setMouseCallback('3D', mouse_cb, cam)
     last = time.time()
     last_time = time.time()
     frame_time_target = 1.0 / MAX_FPS if MAX_FPS > 0 else 0.0
+
     while True:
         frame_start = time.time()
         now = frame_start
         dt = max(1e-6, now - last)
         last = now
         frame = renderer.clear()
-        opaque, transparent = get_loaded_meshes()
+        opaque = get_loaded_meshes()[0] + get_loaded_4meshes()[0]
+        transparent = get_loaded_meshes()[1] + get_loaded_4meshes()[1]
         renderer.render_scene(frame, opaque, transparent, cam)
         fps = 1.0 / max(1e-6, (time.time() - last_time))
         last_time = time.time()
-        
+
         speed = MOVE_SPEED * dt
         fwd = cam.forward()
         rgt = cam.right()
@@ -133,6 +141,11 @@ def run():
             player.position -= rgt * speed
         if keyboard.is_pressed('d'):
             player.position += rgt * speed
+
+        if keyboard.is_pressed('e'):
+            rotate_object_4d('hypercube', {'xw': -1})
+        if keyboard.is_pressed('q'):
+            rotate_object_4d('hypercube', {'xw': 1})
 
         if keyboard.is_pressed('up'):
             rotate_object("monkey", rx=0.0, ry=1.0, rz=0.0)

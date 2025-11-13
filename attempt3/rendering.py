@@ -42,6 +42,30 @@ def project_point(focal, width, height, v):
     return sx, sy
 
 @njit(cache=True, fastmath=True)
+def rasterize_line(width, height, frame, p0, p1, color):
+    x0, y0 = p0
+    x1, y1 = p1
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+    while True:
+        if 0 <= x0 < width and 0 <= y0 < height:
+            frame[y0, x0, 0] = color[0]
+            frame[y0, x0, 1] = color[1]
+            frame[y0, x0, 2] = color[2]
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+@njit(cache=True, fastmath=True)
 def rasterize_color(width, height, zbuffer, frame, p2, depths, color):
     xs = np.empty(3, dtype=np.int32)
     ys = np.empty(3, dtype=np.int32)
@@ -165,7 +189,7 @@ class Renderer:
         n = len(tris)
         self.shader_colors = np.full((n, 3), 0, dtype=np.uint8)
         self.shader_lights = np.full(n, 0.0, dtype=np.float32)
-
+        
     def update_shader_cache(self, meshes):
         offset = 0
         for mesh in meshes:
@@ -185,7 +209,10 @@ class Renderer:
         shaded = np.clip(np.array(base_color) * (0.2 + 0.8 * intensity), 0, 1)
         return (int(shaded[0]*255), int(shaded[1]*255), int(shaded[2]*255)), 0.2 + 0.8 * intensity
 
-    def render_scene(self, frame, opaque_meshes, transparent_meshes, cam):
+    def render_scene(self, frame, opaque_meshes, transparent_meshes, cam, edge_meshes=None):
+        if edge_meshes is None:
+            edge_meshes = []
+        
         self.skybox(frame)
         cam_pos = cam.position
         cam_yaw = cam.yaw
@@ -242,3 +269,19 @@ class Renderer:
                 depths = np.array([v[0][1], v[1][1], v[2][1]], dtype=np.float32)
                 alpha = alphas[i]
                 rasterize_transparent(self.width, self.height, frame, p2, depths, shaded, alpha)
+
+        edge_color = (255, 255, 255)  # white edges
+        for mesh in edge_meshes:
+            verts = mesh['verts_world']
+            edges = mesh['edges']
+            verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
+            for e in edges:
+                v0, v1 = verts_cam[e[0]], verts_cam[e[1]]
+                if v0[1] <= self.near and v1[1] <= self.near:
+                    continue
+                try:
+                    p0 = project_point(self.focal, self.width, self.height, v0)
+                    p1 = project_point(self.focal, self.width, self.height, v1)
+                except Exception:
+                    continue
+                rasterize_line(self.width, self.height, frame, p0, p1, edge_color)

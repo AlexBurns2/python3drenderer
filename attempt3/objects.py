@@ -201,6 +201,24 @@ def load_scene_from_obj(objects_with_facets):
 
 print(_loaded_meshes)
 
+def load_edges_from_folder(folder):
+    meshes = []
+    for file in os.listdir(folder):
+        if not file.endswith(".obj"):
+            continue
+        path = os.path.join(folder, file)
+        verts, edges = [], []
+        with open(path) as f:
+            for line in f:
+                if line.startswith("v "):
+                    verts.append([float(x) for x in line.strip().split()[1:4]])
+                elif line.startswith("l "):
+                    e = [int(x)-1 for x in line.strip().split()[1:]]
+                    edges.append(tuple(e))
+        meshes.append({"verts_world": np.array(verts, dtype=np.float32),
+                       "edges": np.array(edges, dtype=np.int32)})
+    return meshes
+
 def get_loaded_meshes():
     global _loaded_meshes
     opaque = []

@@ -44,9 +44,9 @@ for i, point in enumerate(cube1verts):
     for j, test1 in enumerate(cube1verts):
         if i<j and np.sum(np.abs(test1 - point)) == 2:
                 for k, test2 in enumerate(cube1verts):
-                    if k<j and np.sum(np.abs(test2 - point)) == 2:
+                    if j<k and np.sum(np.abs(test2 - point)) == 2:
                         for l, test3 in enumerate(cube1verts):
-                            if j<l and np.sum(np.abs(test3 - test1)) == 2 and np.sum(np.abs(test3 - test2)) == 2:
+                            if k<l and np.sum(np.abs(test3 - test1)) == 2 and np.sum(np.abs(test3 - test2)) == 2:
                                 quads.append((i,j,k,l))
                                 cube1tris.append((i,j,k))
                                 cube1tris.append((j,k,l))
@@ -80,16 +80,26 @@ print(len(cube2tris))
 print(len(joiningtris))
 '''
 
-alltris = np.concatenate((cube1tris, cube2tris, joiningtris), axis = 0)
+alltris = np.concatenate((cube1tris, cube2tris), axis = 0)
 
-verts = np.concatenate((cube1verts, cube2verts), axis=0)
-print(len(verts))
-print(verts)
-
-for i, tri in enumerate(alltris):
+for i, tri in enumerate(cube1tris):
     #print(str(tri[0]))
     #print(str(verts[tri[0]]))
     print("f " + str(tri[0]) + " " + str(tri[1]) + " " + str(tri[2]))
 
 '''f 2/1/1 4/4/1 3/2/1
 f 4/4/2 8/6/2 7/5/2'''
+
+'''
+f 2 3 1
+f 4 7 3
+f 7 1 3
+f 2 4 3
+f 4 8 7
+f 7 5 1
+f 8 5 7
+f 6 1 5
+f 4 6 8
+f 8 6 5
+f 6 2 1
+f 4 2 6'''
