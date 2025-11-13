@@ -14,6 +14,11 @@ from objects import (
     rotate_object,
     keep_transformed_file
 )
+from fdobjects import (
+    scan_fdo_folder,
+    load_scene_from_fdo,
+    get_loaded_4meshes
+)
 import keyboard
 import sys
 import atexit
@@ -26,6 +31,7 @@ NEAR_CLIP = 0.1
 MOVE_SPEED = 2
 MAX_FPS = 144
 OBJ_FOLDER = 'obj_models'
+FDO_FOLDER = '4d_models'
 GRAVITY = -20
 AIRRESISTANCE = 0.01
 
@@ -87,10 +93,11 @@ def run():
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     load_colliders()
     scanned = scan_obj_folder(OBJ_FOLDER)
+    scanned4d = scan_fdo_folder(FDO_FOLDER)
     load_scene_from_obj(scanned)
-
+    load_scene_from_fdo(scanned4d)
     
-    opaque, transparent = get_loaded_meshes()
+    opaque, transparent = get_loaded_meshes() + get_loaded_4meshes
     print("opaque:", len(opaque), "transparent:", len(transparent))
     renderer.init_shader_cache([tri for mesh in (opaque+transparent) for tri in mesh['tris']])
     renderer.update_shader_cache(opaque + transparent)

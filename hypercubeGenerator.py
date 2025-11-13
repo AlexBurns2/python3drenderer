@@ -7,8 +7,8 @@ import atexit
 
 vertices = np.array(list(product([-1, 1], repeat=4)))
 
-print(vertices)
-print(len(vertices))
+#print(vertices)
+#print(len(vertices))
 
 edges = []
 for i, p1 in enumerate(vertices):
@@ -26,17 +26,16 @@ for i, point in enumerate(vertices):
                 if k<j and np.sum(np.abs(test2 - point)) == 2:
                     tris.append((i,j,k))
 tris = np.array(tris)
-print(tris)
-print(len(tris))
+#print(tris)
+#print(len(tris))
 
 
 quads = []
 cube1verts = np.array(list(product([-1, 1], repeat=3)))
 cube2verts = np.array(list(product([-1, 1], repeat=3)))
 cube1verts = np.c_[cube1verts, np.ones(len(cube1verts))]
-print(cube1verts)
+#print(cube1verts)
 cube2verts = np.c_[cube2verts, np.full(len(cube1verts), -1, dtype=int)]
-verts = cube1verts + cube2verts
 
 cube1tris = []
 cube2tris = []
@@ -75,16 +74,22 @@ for i, point in enumerate(cube2verts):
                                 quads.append((i+8,j+8,k,l))
                                 joiningtris.append((i+8,j+8,k))
                                 joiningtris.append((j+8,k,l))
-
+'''
 print(len(cube1tris))
 print(len(cube2tris))
 print(len(joiningtris))
+'''
 
-alltris = cube1tris + cube2tris + joiningtris
+alltris = np.concatenate((cube1tris, cube2tris, joiningtris), axis = 0)
+
+verts = np.concatenate((cube1verts, cube2verts), axis=0)
+print(len(verts))
+print(verts)
 
 for i, tri in enumerate(alltris):
-    print("f ")
-    print(tri[1][0])
+    #print(str(tri[0]))
+    #print(str(verts[tri[0]]))
+    print("f " + str(tri[0]) + " " + str(tri[1]) + " " + str(tri[2]))
 
 '''f 2/1/1 4/4/1 3/2/1
 f 4/4/2 8/6/2 7/5/2'''
