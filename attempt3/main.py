@@ -96,9 +96,12 @@ def run():
     scanned4d = scan_fdo_folder(FDO_FOLDER)
     load_scene_from_obj(scanned)
     load_scene_from_fdo(scanned4d)
-    
-    opaque, transparent = get_loaded_meshes() + get_loaded_4meshes
+
+    opaque, transparent = get_loaded_4meshes()
+    #opaque = get_loaded_meshes()[0] + get_loaded_4meshes()[0]
+    #transparent = get_loaded_meshes()[1] + get_loaded_4meshes()[1]
     print("opaque:", len(opaque), "transparent:", len(transparent))
+
     renderer.init_shader_cache([tri for mesh in (opaque+transparent) for tri in mesh['tris']])
     renderer.update_shader_cache(opaque + transparent)
     cv2.namedWindow('3D', cv2.WINDOW_NORMAL)

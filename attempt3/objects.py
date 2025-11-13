@@ -202,6 +202,7 @@ def load_scene_from_obj(objects_with_facets):
 print(_loaded_meshes)
 
 def get_loaded_meshes():
+    global _loaded_meshes
     opaque = []
     transparent = []
     #print("Total loaded meshes:", len(_loaded_meshes))

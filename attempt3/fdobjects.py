@@ -28,11 +28,6 @@ def parse_fdt(path):
                 parts = line.split()
                 kd = tuple(float(p) for p in parts[1:4])
                 materials[current]['Kd'] = kd
-            elif current and line.startswith('map_Kd'):
-                # texture path relative to mtl file location
-                tex_name = line.split(maxsplit=1)[1].strip()
-                tex_path = os.path.join(folder, tex_name)
-                materials[current]['map_Kd'] = tex_path
             elif current and line.startswith('d '):
                 parts = line.split()
                 materials[current]['d'] = float(parts[1])
@@ -59,7 +54,7 @@ def parse_fdo(path):
                 cur_fdt = line.split(maxsplit=1)[1].strip()
             elif line.startswith('v '):
                 parts = line.split()
-                verts.append(tuple(float(p) for p in parts[1:4]))
+                verts.append(tuple(float(p) for p in parts[1:5]))
             elif line.startswith('f '):
                 parts = line.split()[1:]
                 idxs = []
@@ -79,11 +74,12 @@ def parse_fdo(path):
 
     facets = []
     for f in faces:
-        v = [verts[i[0]] for i in f['verts']]
-        v0, v1, v2, v3 = np.array(v[0]), np.array(v[1]), np.array(v[2]), np.array(v[3])
+        v = [verts[i] for i in f['verts']]
+       # v0, v1, v2, v3 = np.array(v[0]), np.array(v[1]), np.array(v[2]), np.array(v[3])
         mat = materials.get(f['material'], {})
         col = mat.get('Kd', (1.0, 1.0, 1.0))
-        facets.append({'verts': v,  'color': col})
+        alpha = mat.get('d', 1.0)
+        facets.append({'verts': v, 'uvs': None, 'normal': None, 'color': col, 'texture': Noone, 'alpha': alpha})
     return facets
 
 
@@ -96,24 +92,23 @@ def scan_fdo_folder(folder='4d_models'):
             continue
         if fn.lower().endswith('.hidden.fdo'):
             continue
-        obj_path = os.path.join(folder, fn)
-        azb_path = _make_azb_copy(obj_path)
+        fdo_path = os.path.join(folder, fn)
+        azb_path = _make_azb_copy(fdo_path)
         facets = parse_fdo(azb_path)
         fdos.append({'name': fn, 'facets': facets, 'azb_path': azb_path})
     return fdos
 
-def _make_azb_copy(obj_path):
-    azb_path = obj_path[:-4] + '.azb'
+def _make_azb_copy(fdo_path):
+    azb_path = fdo_path[:-4] + '.azb'
     if not os.path.exists(azb_path):
-        shutil.copy2(obj_path, azb_path)
+        shutil.copy2(fdo_path, azb_path)
         azb_files.append(azb_path)
     return azb_path
 
-
 def load_scene_from_fdo(objects_with_facets):
-    global _loaded_meshes, _loaded_meshes_by_name
-    _loaded_meshes = []
-    _loaded_meshes_by_name = {}
+    global _loaded_4meshes, _loaded_4meshes_by_name
+    _loaded_4meshes = []
+    _loaded_4meshes_by_name = {}
 
     for fdo in objects_with_facets:
         facets = fdo.get('facets') if 'facets' in fdo else fdo
@@ -124,6 +119,7 @@ def load_scene_from_fdo(objects_with_facets):
         verts = []
         tris = []
         tri_colors = []
+        tri_alphas = []
 
         for f in facets:
             idxs = []
@@ -135,6 +131,7 @@ def load_scene_from_fdo(objects_with_facets):
                 idxs.append(vert_map[key])
             tris.append((idxs[0], idxs[1], idxs[2]))
             tri_colors.append(np.array(f['color'], dtype=float))
+            tri_alphas.append(float(f.get('alpha', 1.0)))
 
         mesh = {
             'name': fdo.get('name', 'unnamed'),
@@ -142,24 +139,26 @@ def load_scene_from_fdo(objects_with_facets):
             'azb_path': azb_path,
             'verts_world': np.array(verts, dtype=float),
             'tris': tris,
-            'tri_normals_world': np.array(None, dtype=float),
+            'tri_normals_world': None,
             'colors': np.array(tri_colors, dtype=float),
+            'alpha': np.array(tri_alphas, dtype=float),
             'uvs': None,
             'texture': None
         }
-        _loaded_meshes_by_name[basename.lower()] = len(_loaded_meshes)
-        _loaded_meshes.append(mesh)
-
-    return _loaded_meshes
+        _loaded_4meshes_by_name[basename.lower()] = len(_loaded_4meshes)
+        _loaded_4meshes.append(mesh)
+    print("loaded 4D meshes:", len(_loaded_4meshes))
+    return _loaded_4meshes
 
 def get_loaded_4meshes():
     global _loaded_4meshes
-    _loaded_4meshes = []
+    print(_loaded_4meshes)
     for mesh in _loaded_4meshes:
-        for vert in mesh['verts']:
+        for vert in mesh['verts_world']:
             vert[0] = vert[0] * 1/(1+vert[3])
             vert[1] = vert[1] * 1/(1+vert[3])
             vert[2] = vert[2] * 1/(1+vert[3])
+        print(mesh)
     opaque = []
     transparent = []
     for m in _loaded_4meshes:
