@@ -42,22 +42,27 @@ cube2tris = []
 
 for i, point in enumerate(cube1verts):
     for j, test1 in enumerate(cube1verts):
-        if i<j and np.sum(np.abs(test1 - point)) == 2:
-                for k, test2 in enumerate(cube1verts):
-                    if j<k and np.sum(np.abs(test2 - point)) == 2:
-                        for l, test3 in enumerate(cube1verts):
-                            if k<l and np.sum(np.abs(test3 - test1)) == 2 and np.sum(np.abs(test3 - test2)) == 2:
-                                quads.append((i,j,k,l))
-                                cube1tris.append((i,j,k))
-                                cube1tris.append((j,k,l))
+        if np.sum(np.abs(test1 - point)) == 2:
+            print(str(point) + " " + str(test1))
+
+for i, point in enumerate(cube1verts):
+    for j, test1 in enumerate(cube1verts):
+        if j>i and np.sum(np.abs(test1 - point)) == 2:
+            for k, test2 in enumerate(cube1verts):
+                if k>j and np.sum(np.abs(test2 - point)) == 2:
+                    for l, test3 in enumerate(cube1verts):
+                        if l != i and np.sum(np.abs(test3 - test1)) == 2 and np.sum(np.abs(test3 - test2)) == 2:
+                            quads.append((i,j,k,l))
+                            cube1tris.append((i,j,k))
+                            cube1tris.append((j,k,l))
 
 for i, point in enumerate(cube2verts):
     for j, test1 in enumerate(cube2verts):
-        if i<j and np.sum(np.abs(test1 - point)) == 2:
+        if j>i and np.sum(np.abs(test1 - point)) == 2:
                 for k, test2 in enumerate(cube2verts):
-                    if k<j and np.sum(np.abs(test2 - point)) == 2:
+                    if k>j and np.sum(np.abs(test2 - point)) == 2:
                         for l, test3 in enumerate(cube2verts):
-                            if j<l and np.sum(np.abs(test3 - test1)) == 2 and np.sum(np.abs(test3 - test2)) == 2:
+                            if l != i and np.sum(np.abs(test3 - test1)) == 2 and np.sum(np.abs(test3 - test2)) == 2:
                                 quads.append((i+8,j+8,k+8,l+8))
                                 cube2tris.append((i+8,j+8,k+8))
                                 cube2tris.append((j+8,k+8,l+8))
@@ -80,12 +85,15 @@ print(len(cube2tris))
 print(len(joiningtris))
 '''
 
-alltris = np.concatenate((cube1tris, cube2tris), axis = 0)
+alltris = np.concatenate((cube1tris, cube2tris, joiningtris), axis = 0)
+
 
 for i, tri in enumerate(cube1tris):
     #print(str(tri[0]))
     #print(str(verts[tri[0]]))
-    print("f " + str(tri[0]) + " " + str(tri[1]) + " " + str(tri[2]))
+    print("f " + str(tri[0] + 1) + " " + str(tri[1] + 1) + " " + str(tri[2] + 1))
+
+print(len(cube1tris))
 
 '''f 2/1/1 4/4/1 3/2/1
 f 4/4/2 8/6/2 7/5/2'''

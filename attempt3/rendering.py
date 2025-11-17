@@ -17,14 +17,11 @@ def world_to_camera(points, cam_pos, cam_yaw, cam_pitch):
     return pts.dot(M)
 
 @njit(cache=True, fastmath=True)
-def backface_cull(tri_cam, cam_pos):
+def backface_cull(tri_cam, normal, cam_pos):
     v0, v1, v2 = tri_cam
-    
-    e1 = v1 - v0
-    e2 = v2 - v0
-    n = np.cross(e1, e2)
-    dotProd = np.dot(n, (v0 + v1 + v2) / 3 - cam_pos)
-    return dotProd <= 0, n
+  #  dotProd = np.dot(n, (v0 + v1 + v2) / 3 - cam_pos)
+    dotProd = np.dot(normal, (v0 + v1 + v2) / 3 - cam_pos)
+    return dotProd > 0, normal
 
 @njit(cache=True, fastmath=True)
 def normalize(v):
@@ -230,7 +227,8 @@ class Renderer:
                 if v0[1] <= self.near and v1[1] <= self.near and v2[1] <= self.near:
                     tri_index += 1
                     continue
-                visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), cam_pos)
+              #  visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), cam_pos)
+                visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), normals[i], cam_pos)
                 if not visible:
                     tri_index += 1
                     continue
