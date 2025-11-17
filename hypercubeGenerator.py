@@ -37,13 +37,13 @@ cube1verts = np.c_[cube1verts, np.ones(len(cube1verts))]
 #print(cube1verts)
 cube2verts = np.c_[cube2verts, np.full(len(cube1verts), -1, dtype=int)]
 
+allverts = np.concatenate((cube1verts, cube2verts), axis = 0)
+
 cube1tris = []
 cube2tris = []
 
-for i, point in enumerate(cube1verts):
-    for j, test1 in enumerate(cube1verts):
-        if np.sum(np.abs(test1 - point)) == 2:
-            print(str(point) + " " + str(test1))
+for i, point in enumerate(allverts):
+    print(point)
 
 for i, point in enumerate(cube1verts):
     for j, test1 in enumerate(cube1verts):
@@ -69,16 +69,16 @@ for i, point in enumerate(cube2verts):
 
 joiningtris = []
 
-for i, point in enumerate(cube2verts):
-    for j, test1 in enumerate(cube2verts):
-        if i<j and np.sum(np.abs(test1 - point)) == 2:
-                for k, test2 in enumerate(cube1verts):
+for i, point in enumerate(cube1verts):
+    for j, test1 in enumerate(cube1verts):
+        if j>i and np.sum(np.abs(test1 - point)) == 2:
+                for k, test2 in enumerate(cube2verts):
                     if np.sum(np.abs(test2 - point)) == 2:
-                        for l, test3 in enumerate(cube1verts):
+                        for l, test3 in enumerate(cube2verts):
                             if np.sum(np.abs(test3 - test1)) == 2 and np.sum(np.abs(test3 - test2)) == 2:
-                                quads.append((i+8,j+8,k,l))
-                                joiningtris.append((i+8,j+8,k))
-                                joiningtris.append((j+8,k,l))
+                                quads.append((i,j,k+8,l+8))
+                                joiningtris.append((i,j,k+8))
+                                joiningtris.append((j,k+8,l+8))
 '''
 print(len(cube1tris))
 print(len(cube2tris))
@@ -88,12 +88,12 @@ print(len(joiningtris))
 alltris = np.concatenate((cube1tris, cube2tris, joiningtris), axis = 0)
 
 
-for i, tri in enumerate(cube1tris):
+for i, tri in enumerate(alltris):
     #print(str(tri[0]))
     #print(str(verts[tri[0]]))
     print("f " + str(tri[0] + 1) + " " + str(tri[1] + 1) + " " + str(tri[2] + 1))
 
-print(len(cube1tris))
+print(len(joiningtris))
 
 '''f 2/1/1 4/4/1 3/2/1
 f 4/4/2 8/6/2 7/5/2'''

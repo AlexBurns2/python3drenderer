@@ -69,6 +69,7 @@ def toggle_mouse_lock():
     mouse_locked = not mouse_locked
     mouse_prev = None
 
+
 def mouse_cb(event, x, y, flags, param):
     global mouse_prev
     if not mouse_locked:
@@ -77,6 +78,11 @@ def mouse_cb(event, x, y, flags, param):
     if mouse_prev is None:
         mouse_prev = (x, y)
         return
+    held = True
+    if event == cv2.EVENT_LBUTTONDOWN:
+        held = True
+    if event == cv2.EVENT_LBUTTONDOWN:
+        held = False
     px, py = mouse_prev
     dx = x - px
     dy = y - py
@@ -142,10 +148,13 @@ def run():
         if keyboard.is_pressed('d'):
             player.position += rgt * speed
 
+        
+        rotate_object_4d('hypercube', {'xw': 1})
+
         if keyboard.is_pressed('e'):
-            rotate_object_4d('hypercube', {'xw': -1})
+            rotate_object_4d('hypercube', {'yw': -1})
         if keyboard.is_pressed('q'):
-            rotate_object_4d('hypercube', {'xw': 1})
+            rotate_object_4d('hypercube', {'yw': 1})
 
         if keyboard.is_pressed('up'):
             rotate_object("monkey", rx=0.0, ry=1.0, rz=0.0)

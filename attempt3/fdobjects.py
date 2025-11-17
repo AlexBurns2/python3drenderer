@@ -23,8 +23,6 @@ def define_cam(camera):
     cam = camera
 
 def compute_tri_normals(verts_world, tris):
-    global cam
-    print(cam)
     normals = []
     center = [0, 0, 0]
     for v in verts_world:
@@ -41,6 +39,20 @@ def compute_tri_normals(verts_world, tris):
         normals.append(n)
 
     return np.array(normals, dtype=float)
+
+def compute_cam_normals(verts_world, tris):
+    global cam
+    normals = []
+    for t in tris:
+        v0, v1, v2 = verts_world[t[0]], verts_world[t[1]], verts_world[t[2]]
+        n = np.cross(v1 - v0, v2 - v0)
+        norm = np.linalg.norm(n)
+        n = n / norm if norm != 0 else n
+        if np.dot(n, (v0 + v1 + v2) / 3 - cam.position) <= 0:
+            n = -n
+        normals.append(n)
+    return np.array(normals, dtype=float)
+
 
 def backface_cull(tri_cam, cam_pos):
     v0, v1, v2 = tri_cam
@@ -172,7 +184,7 @@ def load_scene_from_fdo(objects_with_facets):
 
         verts4d_arr = np.array(verts4d, dtype=float)
         verts_world = project_4d_to_3d_array(verts4d_arr, dist=10.0)
-        tri_normals = compute_tri_normals(verts_world, tris)
+        tri_normals = compute_cam_normals(verts_world, tris)
 
         mesh = {
             'name': fdo.get('name', 'unnamed'),
@@ -298,6 +310,6 @@ def rotate_object_4d(name, angles=None, degrees=True, folder='4d_models'):
         m['verts_world'] = project_4d_to_3d_array(m['verts4d'], dist=10.0)
         tris = m['tris']
         tri_normals = []
-        tri_normals = compute_tri_normals(m['verts_world'], tris)
+        tri_normals = compute_cam_normals(m['verts_world'], tris)
         m['tri_normals_world'] = np.array(tri_normals, dtype=float)
     return True
