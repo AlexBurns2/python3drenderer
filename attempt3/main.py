@@ -139,6 +139,11 @@ def run():
         if keyboard.is_pressed('q'):
             rotate_object_4d('hypercube', {'yw': 1})
 
+        if keyboard.is_pressed('up'):
+            translate_object_4d('hypercube', dx=0, dy=0, dz=0, dw=0.1)
+        if keyboard.is_pressed('down'):
+            translate_object_4d('hypercube', dx=0, dy=0, dz=0, dw=-0.1)
+
         opaque = get_loaded_meshes()[0] + get_loaded_4meshes()[0]
         transparent = get_loaded_meshes()[1] + get_loaded_4meshes()[1]
         renderer.render_scene(frame, opaque, transparent, cam)
