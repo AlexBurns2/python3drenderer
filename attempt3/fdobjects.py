@@ -89,6 +89,7 @@ def parse_fdt(path):
 def parse_fdo(path):
     verts = []
     faces = []
+    origin = []
     materials = {}
     cur_fdt = None
     fdt_path = None
@@ -103,6 +104,9 @@ def parse_fdo(path):
                 parts = line.split()
                 if len(parts) >= 2:
                     fdt_path = os.path.join(folder, parts[1].strip())
+            elif line.startswith('c '):
+                parts = line.split()
+                origin = tuple(float(p) for p in parts[1:5])
             elif line.startswith('usefdt'):
                 cur_fdt = line.split(maxsplit=1)[1].strip()
             elif line.startswith('v '):
@@ -127,6 +131,7 @@ def parse_fdo(path):
         col = mat.get('Kd', (1.0, 1.0, 1.0))
         alpha = mat.get('d', 1.0)
         facets.append({
+            'origin': origin,
             'verts4d': v4,
             'uvs': [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             'normal': None,
@@ -168,6 +173,7 @@ def load_scene_from_fdo(objects_with_facets):
         tri_colors = []
         tri_alphas = []
         tri_uvs = []
+        origins = []
 
         for f in facets:
             idxs = []
@@ -176,6 +182,7 @@ def load_scene_from_fdo(objects_with_facets):
                 if key not in vert_map:
                     vert_map[key] = len(verts4d)
                     verts4d.append(np.array(key, dtype=float))
+                    origins.append(np.array(f['origin'], dtype=float))
                 idxs.append(vert_map[key])
             tris.append((idxs[0], idxs[1], idxs[2]))
             tri_colors.append(np.array(f['color'], dtype=float))
@@ -190,6 +197,7 @@ def load_scene_from_fdo(objects_with_facets):
             'name': fdo.get('name', 'unnamed'),
             'basename': basename,
             'azb_path': azb_path,
+            'origin': origins,
             'verts4d': verts4d_arr,
             'verts_world': verts_world,
             'tris': tris,
@@ -227,6 +235,18 @@ def get_loaded_4meshes():
             transparent.append(m)
         else:
             opaque.append(m)
+    for m in transparent:
+        m['verts4d'] = m['verts4d'] + np.array(m['origin'], dtype=float)
+        m['verts_world'] = project_4d_to_3d_array(m['verts4d'], dist=10.0)
+        tris = m['tris']
+        tri_normals = compute_cam_normals(m['verts_world'], tris)
+        m['tri_normals_world'] = np.array(tri_normals, dtype=float)
+    for m in opaque:
+        m['verts4d'] = m['verts4d'] + m['origin']
+        m['verts_world'] = project_4d_to_3d_array(m['verts4d'], dist=10.0)
+        tris = m['tris']
+        tri_normals = compute_tri_normals(m['verts_world'], tris)
+        m['tri_normals_world'] = np.array(tri_normals, dtype=float)
     return opaque, transparent
 
 def _azb_path(name, folder='4d_models'):
@@ -242,17 +262,18 @@ def translate_object_4d(name, dx=0, dy=0, dz=0, dw=0, folder='4d_models'):
         lines = f.readlines()
     with open(azb, 'w') as f:
         for line in lines:
-            if line.startswith('v '):
+            if line.startswith('c '):
                 parts = line.split()
                 x, y, z, w = map(float, parts[1:5])
                 x += dx; y += dy; z += dz; w += dw
-                f.write(f"v {x} {y} {z} {w}\n")
+                f.write(f"c {x} {y} {z} {w}\n")
             else:
                 f.write(line)
     basename = os.path.splitext(name)[0]
     idx = _loaded_4meshes_by_name.get(basename.lower())
     if idx is not None:
         m = _loaded_4meshes[idx]
+        '''
         m['verts4d'] = m['verts4d'] + np.array([dx, dy, dz, dw], dtype=float)
         m['verts_world'] = project_4d_to_3d_array(m['verts4d'], dist=10.0)
         tris = m['tris']
@@ -265,6 +286,8 @@ def translate_object_4d(name, dx=0, dy=0, dz=0, dw=0, folder='4d_models'):
             n = n / np.linalg.norm(n) if np.linalg.norm(n) != 0 else n
             tri_normals.append(n)
         m['tri_normals_world'] = np.array(tri_normals, dtype=float)
+        '''
+        m['origin'] = m["origin"] + np.array([dx, dy, dz, dw], dtype=float)
     return True
 
 def rotate_point_4d(x, y, z, w, angles):
