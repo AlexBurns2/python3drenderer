@@ -333,6 +333,8 @@ def rotate_object_4d(name, angles=None, degrees=True, folder='4d_models'):
         m['verts_world'] = project_4d_to_3d_array(m['verts4d'], dist=10.0)
         tris = m['tris']
         tri_normals = []
-        tri_normals = compute_cam_normals(m['verts_world'], tris)
+        if np.any(m['alpha'] < 1.0):
+            tri_normals = compute_cam_normals(m['verts_world'], tris)
+        else: tri_normals = compute_tri_normals(m['verts_world'], tris)
         m['tri_normals_world'] = np.array(tri_normals, dtype=float)
     return True
