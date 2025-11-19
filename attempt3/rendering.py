@@ -267,7 +267,7 @@ class Renderer:
                 depths = np.array([v[0][1], v[1][1], v[2][1]], dtype=np.float32)
                 alpha = alphas[i]
                 rasterize_transparent(self.width, self.height, frame, p2, depths, shaded, alpha)
-
+'''
         edge_color = (255, 255, 255)  # white edges
         for mesh in edge_meshes:
             verts = mesh['verts_world']
@@ -283,3 +283,4 @@ class Renderer:
                 except Exception:
                     continue
                 rasterize_line(self.width, self.height, frame, p0, p1, edge_color)
+'''

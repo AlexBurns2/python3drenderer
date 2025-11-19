@@ -1,7 +1,7 @@
 import numpy as np
 from math import cos, sin, pi
 
-circle_res = 32
+circle_res = 16
 radius = 1.0
 w_dist = 4.0
 
