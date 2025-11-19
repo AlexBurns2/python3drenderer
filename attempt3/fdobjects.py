@@ -6,7 +6,6 @@ import math
 from rendering import Renderer
 from numba.typed import List as NList
 
-# numba for performance (triangle orientation & normal calc)
 from numba import njit, types
 from numba.typed import Dict, List
 
@@ -110,7 +109,6 @@ def compute_and_orient_triangles(verts, tris, center):
                     neigh_shared_b[tri_i, idx] = b_i
                     neigh_count[tri_i] += 1
 
-    # choose first seed = triangle whose centroid is farthest from center
     maxd = -1.0
     seed = 0
     for t in range(M):
@@ -122,27 +120,21 @@ def compute_and_orient_triangles(verts, tris, center):
             maxd = d
             seed = t
 
-    # visited array and simple BFS queue implemented as int array
     visited = np.zeros(M, dtype=np.int64)
     queue = np.full(M, -1, dtype=np.int64)
     q_head = 0; q_tail = 0
 
-    # helper to enqueue a start triangle and ensure its normal points away from center
     def enqueue_with_outward_orientation(start):
-        # ensure start normal points away from center
         sc = _tri_centroid(verts, oriented[start,0], oriented[start,1], oriented[start,2])
         rn = _tri_raw_normal_by_indices(verts, oriented[start,0], oriented[start,1], oriented[start,2])
         dot_seed = rn[0] * (sc[0] - center[0]) + rn[1] * (sc[1] - center[1]) + rn[2] * (sc[2] - center[2])
         if dot_seed < 0.0:
-            # flip winding
             tmp = oriented[start,1]; oriented[start,1] = oriented[start,2]; oriented[start,2] = tmp
-        # mark and enqueue
         visited[start] = 1
         nonlocal q_tail
         queue[q_tail] = start
         q_tail += 1
 
-    # start with the farthest seed
     enqueue_with_outward_orientation(seed)
 
     # BFS propagate orientation from current queue items
@@ -356,9 +348,12 @@ def load_scene_from_fdo(objects_with_facets):
         else:
             # compute center for seed selection
             center = (verts_world.max(axis=0) + verts_world.min(axis=0)) / 2.0
-            normals, oriented_tris = compute_and_orient_triangles(verts_world, tris_arr, center)
-            tri_normals = normals
-            tris_arr = oriented_tris
+            if np.any(np.array(tri_alphas) < 1.0):
+                tri_normals = np.array(compute_cam_normals(verts_world, tris) , dtype=float)
+            else: 
+                normals, oriented_tris = compute_and_orient_triangles(verts_world, tris_arr, center)
+                tri_normals = normals
+                tris_arr = oriented_tris
 
         mesh = {
             'name': fdo.get('name', 'unnamed'),
@@ -488,5 +483,27 @@ def rotate_object_4d(name, angles=None, degrees=True, folder='4d_models'):
             rx, ry, rz, rw = rotate_point_4d(x, y, z, w, angles)
             rotated[i,0] = rx; rotated[i,1] = ry; rotated[i,2] = rz; rotated[i,3] = rw
         m['verts4d'] = rotated
-        _recompute_mesh_world_and_normals(m)
+        verts4d = m['verts4d']
+        origin = m['origin']
+        m['verts_world'] = project_4d_to_3d_array(verts4d, origin, dist=10.0)
+        tris = m['tris']
+        tri_normals = []
+        if np.any(m['alpha'] < 1.0):
+            tri_normals = compute_cam_normals(m['verts_world'], tris)
+            m['tri_normals_world'] = np.array(tri_normals, dtype=float)
+        else: _recompute_mesh_world_and_normals(m)
     return True
+
+
+def compute_cam_normals(verts_world, tris):
+    global cam
+    normals = []
+    for t in tris:
+        v0, v1, v2 = verts_world[t[0]], verts_world[t[1]], verts_world[t[2]]
+        n = np.cross(v1 - v0, v2 - v0)
+        norm = np.linalg.norm(n)
+        n = n / norm if norm != 0 else n
+        if np.dot(n, (v0 + v1 + v2) / 3 - cam.position) <= 0:
+            n = -n
+        normals.append(n)
+    return np.array(normals, dtype=float)
