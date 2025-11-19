@@ -132,7 +132,7 @@ def run():
         last = now
         frame = renderer.clear()
         
-        rotate_object_4d('hypercube', {'xw': 1})
+        rotate_object_4d('Duocylinder', {'xw': 1})
 
         if keyboard.is_pressed('e'):
             rotate_object_4d('hypercube', {'yw': -1})

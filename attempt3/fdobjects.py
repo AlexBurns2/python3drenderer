@@ -235,7 +235,7 @@ def get_loaded_4meshes():
             transparent.append(m)
         else:
             opaque.append(m)
-    for m in transparent:
+    '''for m in transparent:
         m['verts4d'] = m['verts4d'] + np.array(m['origin'], dtype=float)
         m['verts_world'] = project_4d_to_3d_array(m['verts4d'], dist=10.0)
         tris = m['tris']
@@ -244,9 +244,9 @@ def get_loaded_4meshes():
     for m in opaque:
         m['verts4d'] = m['verts4d'] + m['origin']
         m['verts_world'] = project_4d_to_3d_array(m['verts4d'], dist=10.0)
-        tris = m['tris']
+        tris = m['tris']s
         tri_normals = compute_tri_normals(m['verts_world'], tris)
-        m['tri_normals_world'] = np.array(tri_normals, dtype=float)
+        m['tri_normals_world'] = np.array(tri_normals, dtype=float)'''
     return opaque, transparent
 
 def _azb_path(name, folder='4d_models'):
