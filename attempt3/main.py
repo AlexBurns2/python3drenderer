@@ -133,6 +133,11 @@ def run():
         frame = renderer.clear()
         
         rotate_object_4d('hypercube', {'xw': 1})
+        rotate_object_4d('hypercube2', {'yw': -1})
+        rotate_object_4d('hypercube2', {'yx': 1})
+        rotate_object_4d('duocylinderLP', {'yw': 1})
+        rotate_object('monkey', 0, 0, 1)
+
         renderer.update_shader_cache(opaque + transparent)
 
         if keyboard.is_pressed('e'):
@@ -164,7 +169,7 @@ def run():
         if keyboard.is_pressed('d'):
             player.position += rgt * speed
         
-        player.cam.position = player.position.copy() + np.array([0.0, 0.0, 3.0])
+        player.cam.position = player.position.copy() + np.array([0.0, 0.0, 3.5])
         check_collision(player, height=1.8, radius=0.3)
 
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)

@@ -74,18 +74,14 @@ def compute_and_orient_triangles(verts, tris, center):
     edges_a = np.empty(E, dtype=np.int64)
     edges_b = np.empty(E, dtype=np.int64)
     edges_tri = np.empty(E, dtype=np.int64)
-    edges_local = np.empty(E, dtype=np.int64)  # which local edge index 0/1/2
+    edges_local = np.empty(E, dtype=np.int64)
     e_idx = 0
     for t in range(M):
         a = oriented[t,0]; b = oriented[t,1]; c = oriented[t,2]
-        # edge 0: (a,b)
         edges_a[e_idx] = a; edges_b[e_idx] = b; edges_tri[e_idx] = t; edges_local[e_idx] = 0; e_idx += 1
-        # edge 1: (b,c)
         edges_a[e_idx] = b; edges_b[e_idx] = c; edges_tri[e_idx] = t; edges_local[e_idx] = 1; e_idx += 1
-        # edge 2: (c,a)
         edges_a[e_idx] = c; edges_b[e_idx] = a; edges_tri[e_idx] = t; edges_local[e_idx] = 2; e_idx += 1
 
-    # adjacency: up to 3 neighbors per triangle
     neigh_count = np.zeros(M, dtype=np.int64)
     neigh_tri = np.full((M,3), -1, dtype=np.int64)
     neigh_shared_a = np.full((M,3), -1, dtype=np.int64)
@@ -98,7 +94,6 @@ def compute_and_orient_triangles(verts, tris, center):
                 continue
             if edges_a[j] == b_i and edges_b[j] == a_i:
                 tri_j = edges_tri[j]
-                # add tri_j as neighbor of tri_i
                 idx = neigh_count[tri_i]
                 if idx < 3:
                     neigh_tri[tri_i, idx] = tri_j
@@ -121,18 +116,15 @@ def compute_and_orient_triangles(verts, tris, center):
     queue = np.full(M, -1, dtype=np.int64)
     q_head = 0; q_tail = 0
 
-    def enqueue_with_outward_orientation(start):
-        sc = _tri_centroid(verts, oriented[start,0], oriented[start,1], oriented[start,2])
-        rn = _tri_raw_normal_by_indices(verts, oriented[start,0], oriented[start,1], oriented[start,2])
-        dot_seed = rn[0] * (sc[0] - center[0]) + rn[1] * (sc[1] - center[1]) + rn[2] * (sc[2] - center[2])
-        if dot_seed < 0.0:
-            tmp = oriented[start,1]; oriented[start,1] = oriented[start,2]; oriented[start,2] = tmp
-        visited[start] = 1
-        nonlocal q_tail
-        queue[q_tail] = start
-        q_tail += 1
+    sc = _tri_centroid(verts, oriented[seed,0], oriented[seed,1], oriented[seed,2])
+    rn = _tri_raw_normal_by_indices(verts, oriented[seed,0], oriented[seed,1], oriented[seed,2])
+    dot_seed = rn[0] * (sc[0] - center[0]) + rn[1] * (sc[1] - center[1]) + rn[2] * (sc[2] - center[2])
+    if dot_seed < 0.0:
+        tmp = oriented[seed,1]; oriented[seed,1] = oriented[seed,2]; oriented[seed,2] = tmp
 
-    enqueue_with_outward_orientation(seed)
+    # enqueue seed
+    visited[seed] = 1
+    queue[q_tail] = seed; q_tail += 1
 
     while q_head < q_tail:
         cur = queue[q_head]; q_head += 1
@@ -145,11 +137,16 @@ def compute_and_orient_triangles(verts, tris, center):
                 continue
             sa = neigh_shared_a[cur, ni]; sb = neigh_shared_b[cur, ni]
             na0 = oriented[nbr,0]; na1 = oriented[nbr,1]; na2 = oriented[nbr,2]
-            same_dir = False
+
             if (na0 == sa and na1 == sb) or (na1 == sa and na2 == sb) or (na2 == sa and na0 == sb):
-                same_dir = True
-            if same_dir:
                 tmp = oriented[nbr,1]; oriented[nbr,1] = oriented[nbr,2]; oriented[nbr,2] = tmp
+
+            ncent = _tri_centroid(verts, oriented[nbr,0], oriented[nbr,1], oriented[nbr,2])
+            nr = _tri_raw_normal_by_indices(verts, oriented[nbr,0], oriented[nbr,1], oriented[nbr,2])
+            dote = nr[0] * (ncent[0] - center[0]) + nr[1] * (ncent[1] - center[1]) + nr[2] * (ncent[2] - center[2])
+            if dote < 0.0:
+                tmp = oriented[nbr,1]; oriented[nbr,1] = oriented[nbr,2]; oriented[nbr,2] = tmp
+
             visited[nbr] = 1
             queue[q_tail] = nbr; q_tail += 1
 
@@ -176,6 +173,12 @@ def compute_and_orient_triangles(verts, tris, center):
                 na0 = oriented[nbr,0]; na1 = oriented[nbr,1]; na2 = oriented[nbr,2]
                 if (na0 == sa and na1 == sb) or (na1 == sa and na2 == sb) or (na2 == sa and na0 == sb):
                     tmp = oriented[nbr,1]; oriented[nbr,1] = oriented[nbr,2]; oriented[nbr,2] = tmp
+                # extra outward check
+                ncent = _tri_centroid(verts, oriented[nbr,0], oriented[nbr,1], oriented[nbr,2])
+                nr = _tri_raw_normal_by_indices(verts, oriented[nbr,0], oriented[nbr,1], oriented[nbr,2])
+                dote = nr[0] * (ncent[0] - center[0]) + nr[1] * (ncent[1] - center[1]) + nr[2] * (ncent[2] - center[2])
+                if dote < 0.0:
+                    tmp = oriented[nbr,1]; oriented[nbr,1] = oriented[nbr,2]; oriented[nbr,2] = tmp
                 visited[nbr] = 1
                 queue[q_tail] = nbr; q_tail += 1
 
@@ -186,8 +189,6 @@ def compute_and_orient_triangles(verts, tris, center):
         normals[t,0] = n[0]; normals[t,1] = n[1]; normals[t,2] = n[2]
 
     return normals, oriented
-
-
 
 
 
@@ -235,7 +236,7 @@ def parse_fdo(path):
                     fdt_path = os.path.join(folder, parts[1].strip())
             elif line.startswith('c '):
                 parts = line.split()
-                # store object-level origin translation
+                # object-level translation stored here (but NOT applied now)
                 origin = (float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4]))
             elif line.startswith('usefdt'):
                 cur_fdt = line.split(maxsplit=1)[1].strip()
@@ -261,7 +262,7 @@ def parse_fdo(path):
         col = mat.get('Kd', (1.0, 1.0, 1.0))
         alpha = mat.get('d', 1.0)
         facets.append({
-            'origin': origin,
+            'origin': origin, 
             'verts4d': v4,
             'uvs': [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             'normal': None,
@@ -278,10 +279,8 @@ def _make_azb_copy(fdo_path):
         azb_files.append(azb_path)
     return azb_path
 
-def project_4d_to_3d_array(verts4d, origin4d, dist=10.0):
+def project_4d_to_3d_array(verts4d, dist=10.0):
     v4 = np.array(verts4d, dtype=float)
-    # apply object-level translation (x,y,z,w)
-    v4 = v4 + np.array(origin4d, dtype=float)
     w = v4[:, 3]
     factor1 = dist / (w + dist)
     # avoid divide by zero
@@ -317,7 +316,7 @@ def load_scene_from_fdo(objects_with_facets):
                 key = tuple(v4)
                 if key not in vert_map:
                     vert_map[key] = len(verts4d)
-                    verts4d.append(np.array(key, dtype=float))  # rotation-only coords
+                    verts4d.append(np.array(key, dtype=float))
                 idxs.append(vert_map[key])
             tris.append((idxs[0], idxs[1], idxs[2]))
             tri_colors.append(np.array(f['color'], dtype=float))
@@ -325,31 +324,16 @@ def load_scene_from_fdo(objects_with_facets):
             tri_uvs.append(np.array(f['uvs'], dtype=float))
 
         verts4d_arr = np.array(verts4d, dtype=float)
-        verts_world = project_4d_to_3d_array(verts4d_arr, obj_origin, dist=10.0)
-
-        tris_arr = np.array(tris, dtype=np.int64)
-        if verts_world.shape[0] == 0 or tris_arr.shape[0] == 0:
-            tri_normals = np.zeros((len(tris),3), dtype=float)
-            oriented_tris = tris_arr
-        else:
-            # compute center for seed selection
-            center = (verts_world.max(axis=0) + verts_world.min(axis=0)) / 2.0
-            if np.any(np.array(tri_alphas) < 1.0):
-                tri_normals = np.array(compute_cam_normals(verts_world, tris) , dtype=float)
-            else: 
-                normals, oriented_tris = compute_and_orient_triangles(verts_world, tris_arr, center)
-                tri_normals = normals
-                tris_arr = oriented_tris
 
         mesh = {
             'name': fdo.get('name', 'unnamed'),
             'basename': basename,
             'azb_path': azb_path,
-            'origin': np.array(obj_origin, dtype=float),   # object-level translation
-            'verts4d': verts4d_arr,                        # stored rotated coords (rotation = vertices)
-            'verts_world': verts_world,
-            'tris': tris_arr,
-            'tri_normals_world': np.array(tri_normals, dtype=float),
+            'origin': np.array(obj_origin, dtype=float), 
+            'verts4d': verts4d_arr,
+            'verts_world': None, 
+            'tris': np.array(tris, dtype=np.int64),
+            'tri_normals_world': None,
             'colors': np.array(tri_colors, dtype=float),
             'alpha': np.array(tri_alphas, dtype=float),
             'uvs': tri_uvs,
@@ -377,12 +361,48 @@ def scan_fdo_folder(folder='4d_models'):
 
 def get_loaded_4meshes():
     global _loaded_4meshes
-    opaque, transparent = [], []
+    opaque = []
+    transparent = []
+
     for m in _loaded_4meshes:
-        if np.any(m['alpha'] < 1.0):
-            transparent.append(m)
+        if m['verts4d'] is None or m['verts4d'].shape[0] == 0:
+            verts_world = np.zeros((0,3), dtype=float)
         else:
-            opaque.append(m)
+            verts_world = project_4d_to_3d_array(m['verts4d'], dist=10.0)
+        verts_world += m['origin'][:3]
+        tris = m['tris']
+        tri_normals = None
+        if verts_world.shape[0] == 0 or tris.shape[0] == 0:
+            tri_normals = np.zeros((len(tris), 3), dtype=float)
+        else:
+            center = (verts_world.max(axis=0) + verts_world.min(axis=0)) / 2.0
+            if np.any(m['alpha'] < 1.0):
+                tri_normals = compute_cam_normals(verts_world, tris)
+            else:
+                normals, oriented_tris = compute_and_orient_triangles(verts_world, tris, center)
+                tri_normals = normals
+                tris = oriented_tris
+
+        mesh_copy = {
+            'name': m['name'],
+            'basename': m['basename'],
+            'azb_path': m['azb_path'],
+            'origin': m['origin'].copy(),
+            'verts4d': m['verts4d'].copy(),
+            'verts_world': verts_world,
+            'tris': np.array(tris, dtype=np.int64),
+            'tri_normals_world': np.array(tri_normals, dtype=float),
+            'colors': m['colors'].copy(),
+            'alpha': m['alpha'].copy(),
+            'uvs': list(m['uvs']),
+            'texture': m['texture']
+        }
+
+        if np.any(mesh_copy['alpha'] < 1.0):
+            transparent.append(mesh_copy)
+        else:
+            opaque.append(mesh_copy)
+
     return opaque, transparent
 
 def _azb_path(name, folder='4d_models'):
@@ -393,7 +413,12 @@ def _azb_path(name, folder='4d_models'):
 def _recompute_mesh_world_and_normals(m):
     verts4d = m['verts4d']
     origin = m['origin']
-    m['verts_world'] = project_4d_to_3d_array(verts4d, origin, dist=10.0)
+    if verts4d is None or verts4d.shape[0] == 0:
+        m['verts_world'] = np.zeros((0,3), dtype=float)
+        m['tri_normals_world'] = np.zeros((len(m['tris']),3), dtype=float)
+        return
+    v4_with_origin = verts4d + origin
+    m['verts_world'] = project_4d_to_3d_array(v4_with_origin, dist=10.0)
     tris_arr = np.array(m['tris'], dtype=np.int64)
     if m['verts_world'].shape[0] == 0 or tris_arr.shape[0] == 0:
         m['tri_normals_world'] = np.zeros((len(tris_arr),3), dtype=float)
@@ -423,7 +448,6 @@ def translate_object_4d(name, dx=0, dy=0, dz=0, dw=0, folder='4d_models'):
     if idx is not None:
         m = _loaded_4meshes[idx]
         m['origin'] = m['origin'] + np.array([dx, dy, dz, dw], dtype=float)
-        _recompute_mesh_world_and_normals(m)
     return True
 
 def rotate_point_4d(x, y, z, w, angles):
@@ -453,12 +477,13 @@ def rotate_object_4d(name, angles=None, degrees=True, folder='4d_models'):
         if line.startswith('v '):
             parts = line.split()
             x, y, z, w = map(float, parts[1:5])
-            x, y, z, w = rotate_point_4d(x, y, z, w, angles)
-            new_lines.append(f"v {x} {y} {z} {w}\n")
+            rx, ry, rz, rw = rotate_point_4d(x, y, z, w, angles)
+            new_lines.append(f"v {rx} {ry} {rz} {rw}\n")
         else:
             new_lines.append(line)
     with open(azb, 'w') as f:
         f.writelines(new_lines)
+
     basename = os.path.splitext(name)[0]
     idx = _loaded_4meshes_by_name.get(basename.lower())
     if idx is not None:
@@ -469,17 +494,7 @@ def rotate_object_4d(name, angles=None, degrees=True, folder='4d_models'):
             rx, ry, rz, rw = rotate_point_4d(x, y, z, w, angles)
             rotated[i,0] = rx; rotated[i,1] = ry; rotated[i,2] = rz; rotated[i,3] = rw
         m['verts4d'] = rotated
-        verts4d = m['verts4d']
-        origin = m['origin']
-        m['verts_world'] = project_4d_to_3d_array(verts4d, origin, dist=10.0)
-        tris = m['tris']
-        tri_normals = []
-        if np.any(m['alpha'] < 1.0):
-            tri_normals = compute_cam_normals(m['verts_world'], tris)
-            m['tri_normals_world'] = np.array(tri_normals, dtype=float)
-        else: _recompute_mesh_world_and_normals(m)
     return True
-
 
 def compute_cam_normals(verts_world, tris):
     global cam

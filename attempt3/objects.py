@@ -63,6 +63,9 @@ def parse_obj(path):
     cur_mtl = None
     mtl_path = None
     folder = os.path.dirname(path)
+    
+    origin = 0.0, 0.0, 0.0
+    use_origin = False
 
     with open(path, 'r') as f:
         for raw in f:
@@ -75,6 +78,10 @@ def parse_obj(path):
                     mtl_path = os.path.join(folder, parts[1].strip())
             elif line.startswith('usemtl'):
                 cur_mtl = line.split(maxsplit=1)[1].strip()
+            elif line.startswith('c '):
+                parts = line.split()
+                origin = (float(parts[1]), float(parts[2]), float(parts[3]))
+                use_origin = True
             elif line.startswith('v '):
                 parts = line.split()
                 verts.append(tuple(float(p) for p in parts[1:4]))
@@ -119,7 +126,7 @@ def parse_obj(path):
         col = mat.get('Kd', (1.0, 1.0, 1.0))
         tex = mat.get('map_Kd', None)
         alpha = mat.get('d', 1.0)
-        facets.append({'verts': v, 'uvs': uv, 'normal': n, 'color': col, 'texture': tex, 'alpha': alpha})
+        facets.append({'useorigin': use_origin, 'origin': origin, 'verts': v, 'uvs': uv, 'normal': n, 'color': col, 'texture': tex, 'alpha': alpha})
     return facets
 
 def _make_azb_copy(obj_path):
@@ -161,6 +168,11 @@ def load_scene_from_obj(objects_with_facets):
         tri_uvs = []
         tex_path = None
 
+        obj_origin = (0.0, 0.0, 0.0)
+        if len(facets) > 0:
+            obj_origin = facets[0].get('origin', obj_origin)
+            use_origin = facets[0].get('useorigin', False)
+
         for f in facets:
             idxs = []
             for v in f['verts']:
@@ -185,6 +197,8 @@ def load_scene_from_obj(objects_with_facets):
             'name': obj.get('name', 'unnamed'),
             'basename': basename,
             'azb_path': azb_path,
+            'useorigin': use_origin,
+            'origin': np.array(obj_origin, dtype=float),
             'verts_world': np.array(verts, dtype=float),
             'tris': tris,
             'tri_normals_world': np.array(tri_normals, dtype=float),
@@ -223,12 +237,48 @@ def get_loaded_meshes():
     global _loaded_meshes
     opaque = []
     transparent = []
-    #print("Total loaded meshes:", len(_loaded_meshes))
+    mesh_copies = []
+
     for m in _loaded_meshes:
+        if m['verts_world'] is None or m['verts_world'].shape[0] == 0:
+            verts_world = np.zeros((0, 3), dtype=float)
+        else:
+            verts_world = np.array(m['verts_world'], dtype=float)
+            if m.get('useorigin', True):
+                verts_world = verts_world + m['origin']
+
+        tris = np.array(m['tris'], dtype=np.int32)
+        tri_normals = np.array(m['tri_normals_world'], dtype=float)
+        colors = np.array(m['colors'], dtype=float)
+        alpha = np.array(m['alpha'], dtype=float)
+
+        uvs = np.array(m['uvs'], dtype=float)
+        texture = m['texture']
+
+        mesh_copy = {
+            'name': m['name'],
+            'basename': m['basename'],
+            'azb_path': m['azb_path'],
+            'useorigin': m['useorigin'],
+            'origin': m['origin'].copy(),
+            'verts_world': verts_world,
+            'tris': tris,
+            'tri_normals_world': tri_normals,
+            'colors': colors,
+            'alpha': alpha,
+            'uvs': uvs,
+            'texture': texture,
+        }
+
+        mesh_copies.append(mesh_copy)
+
+    # sort into opaque / transparent lists
+    for m in mesh_copies:
         if np.any(m['alpha'] < 1.0):
             transparent.append(m)
         else:
             opaque.append(m)
+
     return opaque, transparent
 
 def _azb_path(name, folder):
@@ -254,7 +304,10 @@ def translate_object(name, dx, dy, dz, folder='obj_models'):
     idx = _loaded_meshes_by_name.get(basename.lower())
     if idx is not None and 0 <= idx < len(_loaded_meshes):
         m = _loaded_meshes[idx]
-        m['verts_world'] = m['verts_world'] + np.array([dx, dy, dz], dtype=float)
+        if m.get('useorigin', False):
+            m['verts_world'] = m['verts_world'] + np.array([dx, dy, dz], dtype=float)
+        else:
+            m['origin'] = m['origin'] + np.array([dx, dy, dz], dtype=float)
     return True
 
 def rotate_object(name, rx=0.0, ry=0.0, rz=0.0, degrees=True, folder='obj_models'):

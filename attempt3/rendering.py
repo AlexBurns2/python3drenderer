@@ -210,7 +210,8 @@ class Renderer:
         if edge_meshes is None:
             edge_meshes = []
         
-        self.skybox(frame, color=(235, 206, 135))
+       # self.skybox(frame, color=(235, 206, 135))
+        self.skybox(frame, color=(255, 255,255))
         cam_pos = cam.position
         cam_yaw = cam.yaw
         cam_pitch = cam.pitch
