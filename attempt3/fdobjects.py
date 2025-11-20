@@ -62,7 +62,6 @@ def compute_and_orient_triangles(verts, tris, center):
     normals = np.zeros((M,3), dtype=np.float64)
     oriented = np.empty((M,3), dtype=np.int64)
 
-    # copy input windings
     for i in range(M):
         oriented[i,0] = tris[i,0]
         oriented[i,1] = tris[i,1]
@@ -71,7 +70,6 @@ def compute_and_orient_triangles(verts, tris, center):
     if M == 0:
         return normals, oriented
 
-    # build edge table: 3*M edges
     E = 3 * M
     edges_a = np.empty(E, dtype=np.int64)
     edges_b = np.empty(E, dtype=np.int64)
@@ -93,7 +91,6 @@ def compute_and_orient_triangles(verts, tris, center):
     neigh_shared_a = np.full((M,3), -1, dtype=np.int64)
     neigh_shared_b = np.full((M,3), -1, dtype=np.int64)
 
-    # Find matching reversed edges by scanning edges (O(E^2) worst-case) but compiled in numba
     for i in range(E):
         a_i = edges_a[i]; b_i = edges_b[i]; tri_i = edges_tri[i]
         for j in range(E):
@@ -137,7 +134,6 @@ def compute_and_orient_triangles(verts, tris, center):
 
     enqueue_with_outward_orientation(seed)
 
-    # BFS propagate orientation from current queue items
     while q_head < q_tail:
         cur = queue[q_head]; q_head += 1
         nc = neigh_count[cur]
@@ -147,33 +143,24 @@ def compute_and_orient_triangles(verts, tris, center):
                 continue
             if visited[nbr]:
                 continue
-            # shared directed edge on cur is (sa,sb)
             sa = neigh_shared_a[cur, ni]; sb = neigh_shared_b[cur, ni]
-            # get neighbor's vertex indices
             na0 = oriented[nbr,0]; na1 = oriented[nbr,1]; na2 = oriented[nbr,2]
-            # if neighbor has the same directed edge (sa,sb) then it must be flipped
             same_dir = False
             if (na0 == sa and na1 == sb) or (na1 == sa and na2 == sb) or (na2 == sa and na0 == sb):
                 same_dir = True
             if same_dir:
-                # flip neighbor by swapping indices 1 and 2
                 tmp = oriented[nbr,1]; oriented[nbr,1] = oriented[nbr,2]; oriented[nbr,2] = tmp
-            # mark and enqueue
             visited[nbr] = 1
             queue[q_tail] = nbr; q_tail += 1
 
-    # Now handle any remaining unvisited triangles by orienting each component independently.
-    # For each unvisited triangle, force its normal outward then BFS-propagate to its component.
     for t in range(M):
         if visited[t]:
             continue
-        # orient this component's seed based on centroid vs center
         sc = _tri_centroid(verts, oriented[t,0], oriented[t,1], oriented[t,2])
         rn = _tri_raw_normal_by_indices(verts, oriented[t,0], oriented[t,1], oriented[t,2])
         dot_seed = rn[0] * (sc[0] - center[0]) + rn[1] * (sc[1] - center[1]) + rn[2] * (sc[2] - center[2])
         if dot_seed < 0.0:
             tmp = oriented[t,1]; oriented[t,1] = oriented[t,2]; oriented[t,2] = tmp
-        # enqueue and BFS-propagate for this component
         visited[t] = 1
         queue[q_tail] = t; q_tail += 1
         while q_head < q_tail:
@@ -192,7 +179,6 @@ def compute_and_orient_triangles(verts, tris, center):
                 visited[nbr] = 1
                 queue[q_tail] = nbr; q_tail += 1
 
-    # finally compute normals for oriented triangles
     for t in range(M):
         i0 = oriented[t,0]; i1 = oriented[t,1]; i2 = oriented[t,2]
         n = _tri_raw_normal_by_indices(verts, i0, i1, i2)
