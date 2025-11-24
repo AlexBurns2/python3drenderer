@@ -25,7 +25,7 @@ def backface_cull(tri_cam, normal, cam_pos):
     v0, v1, v2 = tri_cam
   #  dotProd = np.dot(n, (v0 + v1 + v2) / 3 - cam_pos)
     dotProd = np.dot(normal, (v0 + v1 + v2) / 3 - cam_pos)
-    return dotProd > 0, normal
+    return dotProd < 0, normal
 
 @njit(cache=True, fastmath=True)
 def normalize(v):
@@ -206,7 +206,7 @@ class Renderer:
         self.zbuffer.fill(np.inf)
         return np.zeros((self.height, self.width, 3), dtype=np.uint8)
     
-    def skybox(self, frame, color=(0,0,0)):
+    def skybox(self, frame, color=(0, 0, 0)):
         frame[:, :] = color
     
     def init_shader_cache(self, tris):
@@ -237,7 +237,8 @@ class Renderer:
         if edge_meshes is None:
             edge_meshes = []
         
-        self.skybox(frame)
+       # self.skybox(frame, color=(235, 206, 135))
+        self.skybox(frame, color=(255, 255,255))
         cam_pos = cam.position
         cam_yaw = cam.yaw
         cam_pitch = cam.pitch

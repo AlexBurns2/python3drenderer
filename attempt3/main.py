@@ -26,12 +26,12 @@ import keyboard
 import sys
 import atexit
 
-WIDTH = 960
-HEIGHT = 540
+WIDTH = 1920
+HEIGHT = 1080
 FOV_DEGREES = 75.0
 MOUSE_SENSITIVITY = 0.12
 NEAR_CLIP = 0.1
-MOVE_SPEED = 2
+MOVE_SPEED = 6
 MAX_FPS = 144
 OBJ_FOLDER = 'obj_models'
 FDO_FOLDER = '4d_models'
@@ -132,7 +132,12 @@ def run():
         last = now
         frame = renderer.clear()
         
-        rotate_object_4d('hypercube', {'yw': 1})
+        rotate_object_4d('hypercube', {'xw': 1})
+        rotate_object_4d('hypercube2', {'yw': -1})
+        rotate_object_4d('hypercube2', {'yx': 1})
+        rotate_object_4d('duocylinderLP', {'yw': 1})
+        rotate_object('monkey', 0, 0, 1)
+
         renderer.update_shader_cache(opaque + transparent)
 
         if keyboard.is_pressed('e'):
@@ -141,9 +146,9 @@ def run():
             rotate_object_4d('hypercube', {'yw': 1})
 
         if keyboard.is_pressed('up'):
-            translate_object_4d('hypercube', dx=0, dy=0, dz=0, dw=0.1)
+            translate_object_4d('hypercube', dx=0, dy=-0.1, dz=0, dw=0)
         if keyboard.is_pressed('down'):
-            translate_object_4d('hypercube', dx=0, dy=0, dz=0, dw=-0.1)
+            translate_object_4d('hypercube', dx=0, dy=0.1, dz=0, dw=0)
 
         opaque = get_loaded_meshes()[0] + get_loaded_4meshes()[0]
         transparent = get_loaded_meshes()[1] + get_loaded_4meshes()[1]
@@ -164,7 +169,7 @@ def run():
         if keyboard.is_pressed('d'):
             player.position += rgt * speed
         
-        player.cam.position = player.position.copy()
+        player.cam.position = player.position.copy() + np.array([0.0, 0.0, 3.5])
         check_collision(player, height=1.8, radius=0.3)
 
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
