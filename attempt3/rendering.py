@@ -1,6 +1,10 @@
 import numpy as np
 from numba import njit
+import threading
+from timeit import repeat
 
+nthreads = 4
+size = 10**6
 
 @njit(cache=True, fastmath=True)
 def world_to_camera(points, cam_pos, cam_yaw, cam_pitch):
@@ -62,7 +66,7 @@ def rasterize_line(width, height, frame, p0, p1, color):
             err += dx
             y0 += sy
 
-@njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def rasterize_color(width, height, zbuffer, frame, p2, depths, color):
     xs = np.empty(3, dtype=np.int32)
     ys = np.empty(3, dtype=np.int32)
@@ -94,7 +98,7 @@ def rasterize_color(width, height, zbuffer, frame, p2, depths, color):
                     frame[y, x, 1] = color[1]
                     frame[y, x, 2] = color[2]
 
-@njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def rasterize_textured(width, height, zbuffer, frame, p2, depths, uvs, texture, light):
     tex_h, tex_w, _ = texture.shape
     xs = np.empty(3, dtype=np.int32)
@@ -133,7 +137,7 @@ def rasterize_textured(width, height, zbuffer, frame, p2, depths, uvs, texture, 
                     frame[y, x, 1] = min(255, int(color[1] * light))
                     frame[y, x, 2] = min(255, int(color[2] * light))
 
-@njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def rasterize_transparent(width, height, frame, p2, depths, color, alpha):
     xs = np.empty(3, dtype=np.int32)
     ys = np.empty(3, dtype=np.int32)
@@ -162,6 +166,29 @@ def rasterize_transparent(width, height, frame, p2, depths, color, alpha):
                 frame[y, x, 0] = min(255, frame[y, x, 0] + color[0] * alpha)
                 frame[y, x, 1] = min(255, frame[y, x, 1] + color[1] * alpha)
                 frame[y, x, 2] = min(255, frame[y, x, 2] + color[2] * alpha)
+
+def make_multithread(inner_func, numthreads):
+    def func_mt(*args):
+        length = len(args[0])
+        result = np.empty(length, dtype=np.float64)
+        args = (result,) + args
+        chunklen = (length + numthreads - 1) // numthreads
+        # Create argument tuples for each input chunk
+        chunks = [[arg[i * chunklen:(i + 1) * chunklen] for arg in
+                   args] for i in range(numthreads)]
+        # Spawn one thread per chunk
+        threads = [threading.Thread(target=inner_func, args=chunk)
+                   for chunk in chunks]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        return result
+    return func_mt
+
+rasterize_color_mt = make_multithread(rasterize_color, nthreads)
+rasterize_textured_mt = make_multithread(rasterize_textured, nthreads)
+rasterize_transparent_mt = make_multithread(rasterize_transparent, nthreads)
 
 class Renderer:
     def __init__(self, width, height, fov_degrees, near_clip):
@@ -243,9 +270,9 @@ class Renderer:
                 color = self.shader_colors[tri_index]
                 light = self.shader_lights[tri_index]
                 if texture is not None and uvs is not None and len(uvs) > i:
-                    rasterize_textured(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, uvs[i], texture, light)
+                    rasterize_textured_mt(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, uvs[i], texture, light)
                 else:
-                    rasterize_color(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
+                    rasterize_color_mt(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
                 tri_index += 1
 
         for mesh in transparent_meshes:
@@ -266,7 +293,7 @@ class Renderer:
                     continue
                 depths = np.array([v[0][1], v[1][1], v[2][1]], dtype=np.float32)
                 alpha = alphas[i]
-                rasterize_transparent(self.width, self.height, frame, p2, depths, shaded, alpha)
+                rasterize_transparent_mt(self.width, self.height, frame, p2, depths, shaded, alpha)
 '''
         edge_color = (255, 255, 255)  # white edges
         for mesh in edge_meshes:
