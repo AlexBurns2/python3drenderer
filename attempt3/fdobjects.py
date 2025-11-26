@@ -488,24 +488,31 @@ def rotate_object_4d(name, angles=None, degrees=True, folder='4d_models'):
     idx = _loaded_4meshes_by_name.get(basename.lower())
     if idx is not None:
         m = _loaded_4meshes[idx]
-        rotate4d_numba(m, angles)
+        verts4d = m['verts4d']
+        xy = angles.get("xy",0)
+        xz = angles.get("xz",0)
+        xw = angles.get("xw",0)
+        yz = angles.get("yz",0)
+        yw = angles.get("yw",0)
+        zw = angles.get("zw",0)
+        m['verts4d'] = rotate4d_numba(verts4d, xy, xz, xw, yz, yw, zw)
     return True
 
 @njit(cache=True, fastmath=True)
-def rotate4d_numba(m, angles):
-    verts4d = m['verts4d']
+def rotate4d_numba(verts4d, xy, xz, xw, yz, yw, zw):
     rotated = np.empty_like(verts4d)
     for i, (x, y, z, w) in enumerate(verts4d):
+        rx, ry, rz, rw = 0, 0, 0, 0
         cos, sin = math.cos, math.sin
-        c,s = cos(angles.get("xy",0)), sin(angles.get("xy",0)); x,y = c*x - s*y, s*x + c*y
-        c,s = cos(angles.get("xz",0)), sin(angles.get("xz",0)); x,z = c*x - s*z, s*x + c*z
-        c,s = cos(angles.get("xw",0)), sin(angles.get("xw",0)); x,w = c*x - s*w, s*x + c*w
-        c,s = cos(angles.get("yz",0)), sin(angles.get("yz",0)); y,z = c*y - s*z, s*y + c*z
-        c,s = cos(angles.get("yw",0)), sin(angles.get("yw",0)); y,w = c*y - s*w, s*y + c*w
-        c,s = cos(angles.get("zw",0)), sin(angles.get("zw",0)); z,w = c*z - s*w, s*z + c*w
+        c,s = cos(xy), sin(xy); x,y = c*x - s*y, s*x + c*y
+        c,s = cos(xz), sin(xz); x,z = c*x - s*z, s*x + c*z
+        c,s = cos(xw), sin(xw); x,w = c*x - s*w, s*x + c*w
+        c,s = cos(yz), sin(yz); y,z = c*y - s*z, s*y + c*z
+        c,s = cos(yw), sin(yw); y,w = c*y - s*w, s*y + c*w
+        c,s = cos(zw), sin(zw); z,w = c*z - s*w, s*z + c*w
         rotated[i,0] = rx; rotated[i,1] = ry; rotated[i,2] = rz; rotated[i,3] = rw
         rx = x; ry = y; rz = z; rw = w
-    m['verts4d'] = rotated
+    return rotated
 
 def compute_cam_normals(verts_world, tris):
     global cam
