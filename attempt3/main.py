@@ -98,6 +98,7 @@ def mouse_cb(event, x, y, flags, param):
         mouse_prev = (x, y)
     elif event == cv2.EVENT_LBUTTONDOWN:
         held = True
+        print("click")
         mouse_prev = None
 
 def run():
