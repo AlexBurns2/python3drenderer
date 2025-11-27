@@ -510,8 +510,8 @@ def rotate4d_numba(verts4d, xy, xz, xw, yz, yw, zw):
         c,s = cos(yz), sin(yz); y,z = c*y - s*z, s*y + c*z
         c,s = cos(yw), sin(yw); y,w = c*y - s*w, s*y + c*w
         c,s = cos(zw), sin(zw); z,w = c*z - s*w, s*z + c*w
-        rotated[i,0] = rx; rotated[i,1] = ry; rotated[i,2] = rz; rotated[i,3] = rw
         rx = x; ry = y; rz = z; rw = w
+        rotated[i,0] = rx; rotated[i,1] = ry; rotated[i,2] = rz; rotated[i,3] = rw
     return rotated
 
 def compute_cam_normals(verts_world, tris):
