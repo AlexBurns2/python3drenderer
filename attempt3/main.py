@@ -133,7 +133,7 @@ def run():
         last = now
         frame = renderer.clear()
         
-        rotate_object_4d('hypercube', {'xw': 1})
+        rotate_object_4d('hypercube', {'yw': 1})
         rotate_object_4d('hypercube2', {'yw': -1})
         rotate_object_4d('hypercube2', {'yx': 1})
         rotate_object_4d('duocylinderLP', {'yw': 1})
