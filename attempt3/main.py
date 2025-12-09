@@ -12,7 +12,8 @@ from objects import (
     toggle_object,
     translate_object,
     rotate_object,
-    keep_transformed_file
+    keep_transformed_file,
+    scale_object
 )
 from fdobjects import (
     scan_fdo_folder,
@@ -29,15 +30,17 @@ import atexit
 WIDTH = 1920
 HEIGHT = 1080
 FOV_DEGREES = 75.0
-mouse_sens = 0.05
+mouse_sens = 0.10
 NEAR_CLIP = 0.1
-move_speed = 12
-max_fps = 0
+move_speed = 5
+max_fps = 10
 OBJ_FOLDER = 'obj_models'
 FDO_FOLDER = '4d_models'
-GRAVITY = -20
+GRAVITY = -7.5
 AIRRESISTANCE = 0.01
 opendoor = False
+opendoor2 = False
+doorrange = 10
 
 class Player:
     def __init__(self, pos, velocity, mass, cam, grounded = True):
@@ -102,11 +105,86 @@ def mouse_cb(event, x, y, flags, param):
         print("click")
         mouse_prev = None
 
+def lerp(a, b, t):
+    return a + (b - a) * t
+
+CUBE_CENTER = np.array([0.0, 0.0, 7.0])   # <-- adjust if needed
+CUBE_SIZE = 3.0
+CUBE_HALF = CUBE_SIZE / 2.0
+POINT_OFFSETS = {
+    "point1": np.array([-1,  1,  1]),
+    "point2": np.array([ 1,  1,  1]),
+    "point3": np.array([ -1, -1,  1]),
+    "point4": np.array([1, -1,  1]),
+    "point5": np.array([-1,  1, -1]),
+    "point6": np.array([ 1,  1, -1]),
+    "point7": np.array([ -1, -1, -1]),
+    "point8": np.array([1, -1, -1]),
+}
+
+CUBE_SIZE = 6.0
+THIN = 0.1
+
+STATE_DIMS = {
+    "cube":  np.array([CUBE_SIZE, CUBE_SIZE, CUBE_SIZE]),
+    "line":  np.array([CUBE_SIZE, THIN, THIN]),
+    "plane": np.array([CUBE_SIZE, CUBE_SIZE, THIN]),
+}
+
+def cube_to_line(t, t_prev, size=6.0, thin=0.1):
+    S_prev = np.array([size,
+                       lerp(size, thin, t_prev),
+                       lerp(size, thin, t_prev)])
+    S_curr = np.array([size,
+                       lerp(size, thin, t),
+                       lerp(size, thin, t)])
+    return S_curr / S_prev
+
+
+def line_to_plane(t, t_prev, size=6.0, thin=0.1):
+    S_prev = np.array([size,
+                       lerp(thin, size, t_prev),
+                       thin])
+    S_curr = np.array([size,
+                       lerp(thin, size, t),
+                       thin])
+    return S_curr / S_prev
+
+
+def plane_to_cube(t, t_prev, size=6.0, thin=0.1):
+    S_prev = np.array([size, size,
+                       lerp(thin, size, t_prev)])
+    S_curr = np.array([size, size,
+                       lerp(thin, size, t)])
+    return S_curr / S_prev
+
+def cube_absolute_half(stage, t, size=6.0, thin=0.1):
+    if stage == 1:  # cube → line
+        dims = np.array([
+            size,
+            lerp(size, thin, t),
+            lerp(size, thin, t)
+        ])
+    elif stage == 2:  # line → plane
+        dims = np.array([
+            size,
+            lerp(thin, size, t),
+            thin
+        ])
+    else:  # plane → cube
+        dims = np.array([
+            size,
+            size,
+            lerp(thin, size, t)
+        ])
+
+    return dims * 0.5
+
 def run():
-    global opendoor
-    cam = Camera([0.0, 0.0, 0.0], yaw=0.0, pitch=0.0)
+    global opendoor, opendoor2
+    cam = Camera([0.0, 0.0, 0.0], yaw=0, pitch=0.0)
     define_cam(cam)
-    player = Player([0.0, -40.0, 0], [0.0, 0.0, 0.0], 1, cam)
+    player = Player([0, -5, 0], [0.0, 0.0, 0.0], 1, cam)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     load_colliders()
     scanned = scan_obj_folder(OBJ_FOLDER)
@@ -128,6 +206,26 @@ def run():
     last = time.time()
     last_time = time.time()
     frame_time_target = 1.0 / max_fps if max_fps > 0 else 0.0
+    ready = False
+    scale_sequence = ["cube", "line", "plane", "cube"]
+    scale_index = 0
+
+    scale_active = False
+    scale_t = 0.0
+    scale_prev = 0.0
+    scale_duration = 1.5
+
+    scale_t = 0.0
+    scale_prev = 0.0
+    scale_duration = 1.5  # seconds
+    cube_half = np.array([CUBE_HALF, CUBE_HALF, CUBE_HALF])
+
+    point_positions = {}
+
+    for name, offset in POINT_OFFSETS.items():
+        pos = CUBE_CENTER + offset * cube_half
+        point_positions[name] = pos.copy()
+
     while True:
         frame_start = time.time()
         now = frame_start
@@ -172,14 +270,72 @@ def run():
         if keyboard.is_pressed('d'):
             player.position += rgt * speed
 
-        if keyboard.is_pressed('e'):
+        if keyboard.is_pressed('`'):
+            ready = True
+
+        if keyboard.is_pressed('q') and not scale_active:
+            scale_active = True
+            scale_t = 0.0
+            scale_prev = 0.0
+
+            from_state = scale_sequence[scale_index]
+            scale_index = (scale_index + 1) % len(scale_sequence)
+            to_state = scale_sequence[scale_index]
+
+            scale_from = STATE_DIMS[from_state]
+            scale_to   = STATE_DIMS[to_state]
+
+            cube_half = scale_from * 0.5
+            for name, offset in POINT_OFFSETS.items():
+                point_positions[name] = CUBE_CENTER + offset * cube_half
+
+            time.sleep(0.2)
+
+        if player.position[0] > 36 - doorrange and not opendoor:
             opendoor = True
-        print(opendoor)
+        elif player.position[0] <= 36 - doorrange and opendoor:
+            opendoor = False
+
+        if player.position[0] < -36 + doorrange and not opendoor2 and ready:
+            opendoor2 = True
+        elif player.position[0] >= -36 + doorrange and opendoor2 and ready:
+            opendoor2 = False
         
         openDoor()
-        player.cam.position = player.position.copy() + np.array([0.0, 0.0, 3.5])
-        #print(player.position)
-        #check_collision(player, height=1.8, radius=0.3)
+        openDoor2()
+
+        if scale_active:
+            dt_anim = (1.0 / max_fps) / scale_duration
+            scale_prev = scale_t
+            scale_t = min(1.0, scale_t + dt_anim)
+
+            dims_prev = lerp(scale_from, scale_to, scale_prev)
+            dims_curr = lerp(scale_from, scale_to, scale_t)
+
+            s = dims_curr / dims_prev
+            scale_object('cube', s[0], s[1], s[2])
+
+            cube_half = dims_curr * 0.5
+
+            for name, offset in POINT_OFFSETS.items():
+                target = CUBE_CENTER + offset * cube_half
+                delta = target - point_positions[name]
+                translate_object(name, delta[0], delta[1], delta[2])
+                point_positions[name] = target
+
+            if scale_t >= 1.0:
+                scale_active = False
+        
+        for name, offset in POINT_OFFSETS.items():
+            target_pos = CUBE_CENTER + offset * cube_half
+            delta = target_pos - point_positions[name]
+
+            if np.any(delta != 0.0):
+                translate_object(name, delta[0], delta[1], delta[2])
+                point_positions[name] = target_pos
+
+        player.cam.position = player.position.copy() + np.array([0.0, 0.0, 0])
+        print(player.position)
 
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow('3D', frame)
@@ -221,21 +377,59 @@ def launchPlayer(player, jump_force):
     if player.on_ground:
         player.velocity += jump_force
         player.on_ground = False
+ 
+doortimer = 0
 
 def openDoor():
-    timer = 0
+    global doortimer
     if opendoor == True:
-        if timer <= 90:
-            timer += 1
-            rotate_object('door1', -2, 0, 0, degrees=True)
+        if doortimer < 90:
+            doortimer += 1
+            rotate_object('door1', -1, 0, 0, degrees=True)
             translate_object('door1', 0, 0.08, -0.08)
-            rotate_object('door2', -2, 0, 0, degrees=True)
+            rotate_object('door2', -1, 0, 0, degrees=True)
             translate_object('door2', 0, 0.08, 0.08)
-            rotate_object('door3', -2, 0, 0, degrees=True)
+            rotate_object('door3', -1, 0, 0, degrees=True)
             translate_object('door3', 0, -0.08, 0.08)
-            rotate_object('door4', -2, 0, 0, degrees=True)
+            rotate_object('door4', -1, 0, 0, degrees=True)
             translate_object('door4', 0, -0.08, -0.08)
-        print(timer)
+    else:
+        if doortimer > 0:
+            doortimer -= 1
+            rotate_object('door1', 1, 0, 0, degrees=True)
+            translate_object('door1', 0, -0.08, 0.08)
+            rotate_object('door2', 1, 0, 0, degrees=True)
+            translate_object('door2', 0, -0.08, -0.08)
+            rotate_object('door3', 1, 0, 0, degrees=True)
+            translate_object('door3', 0, 0.08, -0.08)
+            rotate_object('door4', 1, 0, 0, degrees=True)
+            translate_object('door4', 0, 0.08, 0.08)
+
+doortimer2 = 0
+def openDoor2():
+    global doortimer2
+    if opendoor2 == True:
+        if doortimer2 < 90:
+            doortimer2 += 1
+            rotate_object('door1 copy', -1, 0, 0, degrees=True)
+            translate_object('door1 copy', 0, 0.08, -0.08)
+            rotate_object('door2 copy', -1, 0, 0, degrees=True)
+            translate_object('door2 copy', 0, 0.08, 0.08)
+            rotate_object('door3 copy', -1, 0, 0, degrees=True)
+            translate_object('door3 copy', 0, -0.08, 0.08)
+            rotate_object('door4 copy', -1, 0, 0, degrees=True)
+            translate_object('door4 copy', 0, -0.08, -0.08)
+    else:
+        if doortimer2 > 0:
+            doortimer2 -= 1
+            rotate_object('door1 copy', 1, 0, 0, degrees=True)
+            translate_object('door1 copy', 0, -0.08, 0.08)
+            rotate_object('door2 copy', 1, 0, 0, degrees=True)
+            translate_object('door2 copy', 0, -0.08, -0.08)
+            rotate_object('door3 copy', 1, 0, 0, degrees=True)
+            translate_object('door3 copy', 0, 0.08, -0.08)
+            rotate_object('door4 copy', 1, 0, 0, degrees=True)
+            translate_object('door4 copy', 0, 0.08, 0.08)
 
 
 

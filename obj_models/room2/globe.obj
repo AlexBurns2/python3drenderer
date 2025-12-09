@@ -2,6 +2,7 @@
 # www.blender.org
 mtllib globe.mtl
 o Icosphere
+c 0 0 7
 v 0.000000 5.241508 0.256153
 v 0.185353 5.376174 0.114555
 v -0.070797 5.459404 0.114555
