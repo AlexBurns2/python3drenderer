@@ -25,7 +25,6 @@ def backface_cull(tri_cam, normal, cam_pos):
 
 @njit(cache=True, fastmath=True)
 def clip_triangle_near(v0, v1, v2, near):
-    # ensure float32
     a0 = v0.astype(np.float32)
     a1 = v1.astype(np.float32)
     a2 = v2.astype(np.float32)
@@ -39,7 +38,6 @@ def clip_triangle_near(v0, v1, v2, near):
     if count == 0:
         return 0, np.empty((0, 3, 3), dtype=np.float32)
 
-    # fully inside
     if count == 3:
         out = np.empty((1, 3, 3), dtype=np.float32)
         out[0, 0] = a0
@@ -47,12 +45,10 @@ def clip_triangle_near(v0, v1, v2, near):
         out[0, 2] = a2
         return 1, out
 
-    # intersection helper INLINE
     def interp(p, q):
         t = (near - p[1]) / (q[1] - p[1])
         return p + t * (q - p)
 
-    # ONE inside -> ONE triangle
     if count == 1:
         if inside0:
             a = a0
@@ -73,7 +69,6 @@ def clip_triangle_near(v0, v1, v2, near):
         out[0, 2] = c
         return 1, out
 
-    # TWO inside -> TWO triangles
     if not inside0:
         outside = a0
         in1 = a1
@@ -92,12 +87,10 @@ def clip_triangle_near(v0, v1, v2, near):
 
     out = np.empty((2, 3, 3), dtype=np.float32)
 
-    # triangle 1
     out[0, 0] = in1
     out[0, 1] = in2
     out[0, 2] = d
 
-    # triangle 2
     out[1, 0] = in2
     out[1, 1] = e
     out[1, 2] = d
@@ -183,13 +176,10 @@ def rasterize_textured(width, height, zbuffer, frame, p2, depths, uvs, texture, 
                     tx = min(max(int(u * (tex_w - 1)), 0), tex_w - 1)
                     ty = min(max(int((1.0 - v) * (tex_h - 1)), 0), tex_h - 1)
                     color = texture[ty, tx]
-                    # apply lighting
                     frame[y, x, 0] = min(255, int(color[0] * light))
                     frame[y, x, 1] = min(255, int(color[1] * light))
                     frame[y, x, 2] = min(255, int(color[2] * light))
 
-# Modified transparent rasterizer: now receives zbuffer and performs per-pixel depth test
-# Uses standard alpha blend (src over dst) and DOES NOT write to zbuffer.
 @njit(cache=True, fastmath=True)
 def rasterize_transparent(width, height, zbuffer, frame, p2, depths, color, alpha):
     xs = np.empty(3, dtype=np.int32)
