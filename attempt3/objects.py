@@ -100,7 +100,7 @@ def parse_obj(path):
                     ti = int(vals[1]) - 1 if len(vals) > 1 and vals[1] else None
                     ni = int(vals[2]) - 1 if len(vals) > 2 and vals[2] else None
                     idxs.append((vi, ti, ni))
-                # triangulate if necessary
+                # triangle
                 if len(idxs) == 3:
                     faces.append({'verts': idxs, 'material': cur_mtl})
                 elif len(idxs) > 3:
@@ -272,7 +272,6 @@ def get_loaded_meshes():
 
         mesh_copies.append(mesh_copy)
 
-    # sort into opaque / transparent lists
     for m in mesh_copies:
         if np.any(m['alpha'] < 1.0):
             transparent.append(m)
@@ -293,7 +292,7 @@ def translate_object(name, dx, dy, dz, folder='obj_models'):
         lines = f.readlines()
     with open(azb, 'w') as f:
         for line in lines:
-            if line.startswith('v '):
+            if line.startswith('c '):
                 parts = line.split()
                 x, y, z = float(parts[1]) + dx, float(parts[2]) + dy, float(parts[3]) + dz
                 f.write(f"v {x} {y} {z}\n")
@@ -347,6 +346,32 @@ def rotate_object(name, rx=0.0, ry=0.0, rz=0.0, degrees=True, folder='obj_models
         if 'tri_normals_world' in m and m['tri_normals_world'] is not None:
             m['tri_normals_world'] = (m['tri_normals_world'] @ R.T).astype(float)
     return True
+
+def scale_object(name, sx, sy, sz, folder='obj_models'):
+    azb = _azb_path(name, folder)
+    if not os.path.exists(azb):
+        return False
+
+    with open(azb, 'r') as f:
+        lines = f.readlines()
+    with open(azb, 'w') as f:
+        for line in lines:
+            if line.startswith('v '):
+                parts = line.split()
+                x, y, z = float(parts[1]) * sx, float(parts[2]) *sy, float(parts[3]) *sz
+                f.write(f"v {x} {y} {z}\n")
+            else:
+                f.write(line)
+                
+    basename = os.path.splitext(name)[0]
+    idx = _loaded_meshes_by_name.get(basename.lower())
+    if idx is not None and 0 <= idx < len(_loaded_meshes):
+        m = _loaded_meshes[idx]
+        m['verts_world'] = (m['verts_world'][0] * sx).astype(float)
+        if 'tri_normals_world' in m and m['tri_normals_world'] is not None:
+            m['tri_normals_world'] = (m['tri_normals_world'] @ R.T).astype(float)
+    return True
+
 
 def toggle_object(name, folder='obj_models'):
     base = f"{name}.obj" if not name.endswith('.obj') else name

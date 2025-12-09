@@ -135,7 +135,7 @@ def rasterize_transparent(width, height, frame, p2, depths, color, alpha):
             w1 = ((y2 - y0)*(x - x2) + (x0 - x2)*(y - y2)) / denom
             w2 = 1.0 - w0 - w1
             if w0 >= 0 and w1 >= 0 and w2 >= 0:
-                # Additive blend
+                # additive blend
                 frame[y, x, 0] = min(255, frame[y, x, 0] + color[0] * alpha)
                 frame[y, x, 1] = min(255, frame[y, x, 1] + color[1] * alpha)
                 frame[y, x, 2] = min(255, frame[y, x, 2] + color[2] * alpha)

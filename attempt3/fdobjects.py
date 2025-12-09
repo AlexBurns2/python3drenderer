@@ -122,7 +122,6 @@ def compute_and_orient_triangles(verts, tris, center):
     if dot_seed < 0.0:
         tmp = oriented[seed,1]; oriented[seed,1] = oriented[seed,2]; oriented[seed,2] = tmp
 
-    # enqueue seed
     visited[seed] = 1
     queue[q_tail] = seed; q_tail += 1
 
@@ -173,7 +172,6 @@ def compute_and_orient_triangles(verts, tris, center):
                 na0 = oriented[nbr,0]; na1 = oriented[nbr,1]; na2 = oriented[nbr,2]
                 if (na0 == sa and na1 == sb) or (na1 == sa and na2 == sb) or (na2 == sa and na0 == sb):
                     tmp = oriented[nbr,1]; oriented[nbr,1] = oriented[nbr,2]; oriented[nbr,2] = tmp
-                # extra outward check
                 ncent = _tri_centroid(verts, oriented[nbr,0], oriented[nbr,1], oriented[nbr,2])
                 nr = _tri_raw_normal_by_indices(verts, oriented[nbr,0], oriented[nbr,1], oriented[nbr,2])
                 dote = nr[0] * (ncent[0] - center[0]) + nr[1] * (ncent[1] - center[1]) + nr[2] * (ncent[2] - center[2])
@@ -189,9 +187,6 @@ def compute_and_orient_triangles(verts, tris, center):
         normals[t,0] = n[0]; normals[t,1] = n[1]; normals[t,2] = n[2]
 
     return normals, oriented
-
-
-
 
 def parse_fdt(path):
     materials = {}
@@ -236,7 +231,6 @@ def parse_fdo(path):
                     fdt_path = os.path.join(folder, parts[1].strip())
             elif line.startswith('c '):
                 parts = line.split()
-                # object-level translation stored here (but NOT applied now)
                 origin = (float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4]))
             elif line.startswith('usefdt'):
                 cur_fdt = line.split(maxsplit=1)[1].strip()

@@ -171,7 +171,7 @@ def run():
             player.position += rgt * speed
         
         player.cam.position = player.position.copy() + np.array([0.0, 0.0, 3.5])
-        check_collision(player, height=1.8, radius=0.3)
+        #check_collision(player, height=1.8, radius=0.3)
 
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow('3D', frame)
@@ -386,11 +386,9 @@ def show_settings_screen():
             if inside_button(mx, my, back_btn):
                 return
 
-        # ESC returns to title
         if key == 27:
             return
 
-        
 if __name__ == '__main__':
     action = title_screen()
     if action == "play":
