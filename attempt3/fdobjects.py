@@ -516,7 +516,7 @@ def compute_cam_normals(verts_world, tris):
         n = np.cross(v1 - v0, v2 - v0)
         norm = np.linalg.norm(n)
         n = n / norm if norm != 0 else n
-        if np.dot(n, (v0 + v1 + v2) / 3 - cam.position) <= 0:
+        if np.dot(n, (v0 + v1 + v2) / 3 - cam.position) >= 0:
             n = -n
         normals.append(n)
     return np.array(normals, dtype=float)

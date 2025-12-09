@@ -29,14 +29,15 @@ import atexit
 WIDTH = 1920
 HEIGHT = 1080
 FOV_DEGREES = 75.0
-mouse_sens = 0.12
+mouse_sens = 0.05
 NEAR_CLIP = 0.1
-move_speed = 6
-max_fps = 144
+move_speed = 12
+max_fps = 0
 OBJ_FOLDER = 'obj_models'
 FDO_FOLDER = '4d_models'
 GRAVITY = -20
 AIRRESISTANCE = 0.01
+opendoor = False
 
 class Player:
     def __init__(self, pos, velocity, mass, cam, grounded = True):
@@ -102,9 +103,10 @@ def mouse_cb(event, x, y, flags, param):
         mouse_prev = None
 
 def run():
-    cam = Camera([0.0, -4.0, 1.2], yaw=0.0, pitch=0.0)
+    global opendoor
+    cam = Camera([0.0, 0.0, 0.0], yaw=0.0, pitch=0.0)
     define_cam(cam)
-    player = Player([0.0, -4.0, 1.2], [0.0, 0.0, 0.0], 1, cam)
+    player = Player([0.0, -40.0, 0], [0.0, 0.0, 0.0], 1, cam)
     renderer = Renderer(WIDTH, HEIGHT, FOV_DEGREES, NEAR_CLIP)
     load_colliders()
     scanned = scan_obj_folder(OBJ_FOLDER)
@@ -169,8 +171,14 @@ def run():
             player.position -= rgt * speed
         if keyboard.is_pressed('d'):
             player.position += rgt * speed
+
+        if keyboard.is_pressed('e'):
+            opendoor = True
+        print(opendoor)
         
+        openDoor()
         player.cam.position = player.position.copy() + np.array([0.0, 0.0, 3.5])
+        #print(player.position)
         #check_collision(player, height=1.8, radius=0.3)
 
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
@@ -213,6 +221,22 @@ def launchPlayer(player, jump_force):
     if player.on_ground:
         player.velocity += jump_force
         player.on_ground = False
+
+def openDoor():
+    timer = 0
+    if opendoor == True:
+        if timer <= 90:
+            timer += 1
+            rotate_object('door1', -2, 0, 0, degrees=True)
+            translate_object('door1', 0, 0.08, -0.08)
+            rotate_object('door2', -2, 0, 0, degrees=True)
+            translate_object('door2', 0, 0.08, 0.08)
+            rotate_object('door3', -2, 0, 0, degrees=True)
+            translate_object('door3', 0, -0.08, 0.08)
+            rotate_object('door4', -2, 0, 0, degrees=True)
+            translate_object('door4', 0, -0.08, -0.08)
+        print(timer)
+
 
 
 _title_click = {"x": None, "y": None, "clicked": False}

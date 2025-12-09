@@ -347,10 +347,15 @@ def rotate_object(name, rx=0.0, ry=0.0, rz=0.0, degrees=True, folder='obj_models
             m['tri_normals_world'] = (m['tri_normals_world'] @ R.T).astype(float)
     return True
 
-def scale_object(name, sx, sy, sz, folder='obj_models'):
+def scale_object(name, sx=1.0, sy=1.0, sz=1.0, folder='obj_models'):
     azb = _azb_path(name, folder)
     if not os.path.exists(azb):
         return False
+    S = np.array([
+        [sx, 0.0, 0.0],
+        [0.0, sy, 0.0],
+        [0.0, 0.0, sz]
+    ])
 
     with open(azb, 'r') as f:
         lines = f.readlines()
@@ -358,20 +363,28 @@ def scale_object(name, sx, sy, sz, folder='obj_models'):
         for line in lines:
             if line.startswith('v '):
                 parts = line.split()
-                x, y, z = float(parts[1]) * sx, float(parts[2]) *sy, float(parts[3]) *sz
-                f.write(f"v {x} {y} {z}\n")
+                v = np.array([
+                    float(parts[1]),
+                    float(parts[2]),
+                    float(parts[3])
+                ])
+                v_new = v @ S.T
+                f.write(f"v {v_new[0]} {v_new[1]} {v_new[2]}\n")
             else:
                 f.write(line)
-                
+
     basename = os.path.splitext(name)[0]
     idx = _loaded_meshes_by_name.get(basename.lower())
     if idx is not None and 0 <= idx < len(_loaded_meshes):
         m = _loaded_meshes[idx]
-        m['verts_world'] = (m['verts_world'][0] * sx).astype(float)
+        m['verts_world'] = (m['verts_world'] @ S.T).astype(float)
         if 'tri_normals_world' in m and m['tri_normals_world'] is not None:
-            m['tri_normals_world'] = (m['tri_normals_world'] @ R.T).astype(float)
+            invS = np.linalg.inv(S)
+            N = invS.T
+            n = m['tri_normals_world'] @ N
+            n /= np.linalg.norm(n, axis=1, keepdims=True)
+            m['tri_normals_world'] = n.astype(float)
     return True
-
 
 def toggle_object(name, folder='obj_models'):
     base = f"{name}.obj" if not name.endswith('.obj') else name

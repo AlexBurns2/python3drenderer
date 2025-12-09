@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit, cuda
+from numba import njit
 import threading
 from timeit import repeat
 
@@ -20,9 +20,89 @@ def world_to_camera(points, cam_pos, cam_yaw, cam_pitch):
 @njit(cache=True, fastmath=True)
 def backface_cull(tri_cam, normal, cam_pos):
     v0, v1, v2 = tri_cam
-  #  dotProd = np.dot(n, (v0 + v1 + v2) / 3 - cam_pos)
     dotProd = np.dot(normal, (v0 + v1 + v2) / 3 - cam_pos)
     return dotProd < 0, normal
+
+@njit(cache=True, fastmath=True)
+def clip_triangle_near(v0, v1, v2, near):
+    # ensure float32
+    a0 = v0.astype(np.float32)
+    a1 = v1.astype(np.float32)
+    a2 = v2.astype(np.float32)
+
+    inside0 = a0[1] > near
+    inside1 = a1[1] > near
+    inside2 = a2[1] > near
+
+    count = (1 if inside0 else 0) + (1 if inside1 else 0) + (1 if inside2 else 0)
+
+    if count == 0:
+        return 0, np.empty((0, 3, 3), dtype=np.float32)
+
+    # fully inside
+    if count == 3:
+        out = np.empty((1, 3, 3), dtype=np.float32)
+        out[0, 0] = a0
+        out[0, 1] = a1
+        out[0, 2] = a2
+        return 1, out
+
+    # intersection helper INLINE
+    def interp(p, q):
+        t = (near - p[1]) / (q[1] - p[1])
+        return p + t * (q - p)
+
+    # ONE inside -> ONE triangle
+    if count == 1:
+        if inside0:
+            a = a0
+            b = interp(a0, a1)
+            c = interp(a0, a2)
+        elif inside1:
+            a = a1
+            b = interp(a1, a2)
+            c = interp(a1, a0)
+        else:
+            a = a2
+            b = interp(a2, a0)
+            c = interp(a2, a1)
+
+        out = np.empty((1, 3, 3), dtype=np.float32)
+        out[0, 0] = a
+        out[0, 1] = b
+        out[0, 2] = c
+        return 1, out
+
+    # TWO inside -> TWO triangles
+    if not inside0:
+        outside = a0
+        in1 = a1
+        in2 = a2
+    elif not inside1:
+        outside = a1
+        in1 = a2
+        in2 = a0
+    else:
+        outside = a2
+        in1 = a0
+        in2 = a1
+
+    d = interp(in1, outside)
+    e = interp(in2, outside)
+
+    out = np.empty((2, 3, 3), dtype=np.float32)
+
+    # triangle 1
+    out[0, 0] = in1
+    out[0, 1] = in2
+    out[0, 2] = d
+
+    # triangle 2
+    out[1, 0] = in2
+    out[1, 1] = e
+    out[1, 2] = d
+
+    return 2, out
 
 @njit(cache=True, fastmath=True)
 def normalize(v):
@@ -31,8 +111,6 @@ def normalize(v):
 
 @njit(cache=True, fastmath=True)
 def project_point(focal, width, height, v):
-    if v[1] <= 0:
-        raise ValueError
     x = (v[0] * focal) / v[1]
     z = (v[2] * focal) / v[1]
     sx = int(width * 0.5 + x)
@@ -110,8 +188,10 @@ def rasterize_textured(width, height, zbuffer, frame, p2, depths, uvs, texture, 
                     frame[y, x, 1] = min(255, int(color[1] * light))
                     frame[y, x, 2] = min(255, int(color[2] * light))
 
+# Modified transparent rasterizer: now receives zbuffer and performs per-pixel depth test
+# Uses standard alpha blend (src over dst) and DOES NOT write to zbuffer.
 @njit(cache=True, fastmath=True)
-def rasterize_transparent(width, height, frame, p2, depths, color, alpha):
+def rasterize_transparent(width, height, zbuffer, frame, p2, depths, color, alpha):
     xs = np.empty(3, dtype=np.int32)
     ys = np.empty(3, dtype=np.int32)
     for i in range(3):
@@ -129,16 +209,39 @@ def rasterize_transparent(width, height, frame, p2, depths, color, alpha):
     denom = (y1 - y2)*(x0 - x2) + (x2 - x1)*(y0 - y2)
     if denom == 0:
         return
+    # clamp alpha to [0,1]
+    a = alpha
+    if a < 0.0:
+        a = 0.0
+    elif a > 1.0:
+        a = 1.0
+
     for y in range(miny, maxy + 1):
         for x in range(minx, maxx + 1):
             w0 = ((y1 - y2)*(x - x2) + (x2 - x1)*(y - y2)) / denom
             w1 = ((y2 - y0)*(x - x2) + (x0 - x2)*(y - y2)) / denom
             w2 = 1.0 - w0 - w1
             if w0 >= 0 and w1 >= 0 and w2 >= 0:
-                # additive blend
-                frame[y, x, 0] = min(255, frame[y, x, 0] + color[0] * alpha)
-                frame[y, x, 1] = min(255, frame[y, x, 1] + color[1] * alpha)
-                frame[y, x, 2] = min(255, frame[y, x, 2] + color[2] * alpha)
+                depth = w0 * depths[0] + w1 * depths[1] + w2 * depths[2]
+                # Only render transparent fragment if it is in front of opaque zbuffer
+                # (i.e., depth < opaque depth)
+                if depth < zbuffer[y, x]:
+                    # standard "source over" alpha blending
+                    dst_r = frame[y, x, 0]
+                    dst_g = frame[y, x, 1]
+                    dst_b = frame[y, x, 2]
+
+                    src_r = color[0]
+                    src_g = color[1]
+                    src_b = color[2]
+
+                    out_r = int(min(255, src_r * a + dst_r * (1.0 - a)))
+                    out_g = int(min(255, src_g * a + dst_g * (1.0 - a)))
+                    out_b = int(min(255, src_b * a + dst_b * (1.0 - a)))
+
+                    frame[y, x, 0] = out_r
+                    frame[y, x, 1] = out_g
+                    frame[y, x, 2] = out_b
 
 class Renderer:
     def __init__(self, width, height, fov_degrees, near_clip):
@@ -186,46 +289,80 @@ class Renderer:
     def render_scene(self, frame, opaque_meshes, transparent_meshes, cam, edge_meshes=None):
         if edge_meshes is None:
             edge_meshes = []
-        
-       # self.skybox(frame, color=(235, 206, 135))
-       # self.skybox(frame, color=(255, 255,255))
-        self.skybox(frame, color=(0,0,0))
+
+        self.skybox(frame, color=(235, 206, 135))  # sky
+       # self.skybox(frame, color=(0,0,0))  # sky
         cam_pos = cam.position
         cam_yaw = cam.yaw
         cam_pitch = cam.pitch
+
         tri_index = 0
+
         for mesh in opaque_meshes:
             verts = mesh['verts_world']
             tris = mesh['tris']
             normals = mesh['tri_normals_world']
             texture = mesh.get('texture', None)
             uvs = mesh.get('uvs', None)
+
             verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
+
             for i, t in enumerate(tris):
-                v0, v1, v2 = verts_cam[t[0]], verts_cam[t[1]], verts_cam[t[2]]
-                if v0[1] <= self.near and v1[1] <= self.near and v2[1] <= self.near:
-                    tri_index += 1
-                    continue
-              #  visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), cam_pos)
-                visible, _ = backface_cull((verts[t[0]], verts[t[1]], verts[t[2]]), normals[i], cam_pos)
+                v0 = verts_cam[t[0]]
+                v1 = verts_cam[t[1]]
+                v2 = verts_cam[t[2]]
+
+                visible, _ = backface_cull(
+                    (verts[t[0]], verts[t[1]], verts[t[2]]),
+                    normals[i],
+                    cam_pos
+                )
                 if not visible:
                     tri_index += 1
                     continue
-                try:
-                    p0 = project_point(self.focal, self.width, self.height, v0)
-                    p1 = project_point(self.focal, self.width, self.height, v1)
-                    p2 = project_point(self.focal, self.width, self.height, v2)
-                except Exception:
+
+                ntris, clipped = clip_triangle_near(v0, v1, v2, self.near)
+                if ntris == 0:
                     tri_index += 1
                     continue
-                depths = np.array([v0[1], v1[1], v2[1]], dtype=np.float32)
+
                 color = self.shader_colors[tri_index]
                 light = self.shader_lights[tri_index]
-                if texture is not None and uvs is not None and len(uvs) > i:
-                    rasterize_textured(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, uvs[i], texture, light)
-                else:
-                    rasterize_color(self.width, self.height, self.zbuffer, frame, (p0, p1, p2), depths, color)
+
+                for ci in range(ntris):
+                    cv0, cv1, cv2 = clipped[ci]
+
+                    try:
+                        p0 = project_point(self.focal, self.width, self.height, cv0)
+                        p1 = project_point(self.focal, self.width, self.height, cv1)
+                        p2 = project_point(self.focal, self.width, self.height, cv2)
+                    except:
+                        continue
+
+                    depths = np.array([cv0[1], cv1[1], cv2[1]], dtype=np.float32)
+
+                    if texture is not None and uvs is not None and len(uvs) > i:
+                        rasterize_textured(
+                            self.width, self.height,
+                            self.zbuffer, frame,
+                            (p0, p1, p2),
+                            depths,
+                            uvs[i],
+                            texture,
+                            light
+                        )
+                    else:
+                        rasterize_color(
+                            self.width, self.height,
+                            self.zbuffer, frame,
+                            (p0, p1, p2),
+                            depths,
+                            color
+                        )
+
                 tri_index += 1
+
+        tri_list = []
 
         for mesh in transparent_meshes:
             verts = mesh['verts_world']
@@ -237,29 +374,50 @@ class Renderer:
             verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
 
             for i, tri in enumerate(tris):
-                v = np.array([verts_cam[tri[0]], verts_cam[tri[1]], verts_cam[tri[2]]])
-                shaded, light = self.shade_triangle(normals[i], colors[i])
-                try:
-                    p2 = [project_point(self.focal, self.width, self.height, v[k]) for k in range(3)]
-                except:
+                v0 = verts_cam[tri[0]]
+                v1 = verts_cam[tri[1]]
+                v2 = verts_cam[tri[2]]
+
+             
+
+                ntris, clipped = clip_triangle_near(v0, v1, v2, self.near)
+                if ntris == 0:
                     continue
-                depths = np.array([v[0][1], v[1][1], v[2][1]], dtype=np.float32)
-                alpha = alphas[i]
-                rasterize_transparent(self.width, self.height, frame, p2, depths, shaded, alpha)
-'''
-        edge_color = (255, 255, 255)  # white edges
-        for mesh in edge_meshes:
-            verts = mesh['verts_world']
-            edges = mesh['edges']
-            verts_cam = world_to_camera(verts, cam_pos, cam_yaw, cam_pitch)
-            for e in edges:
-                v0, v1 = verts_cam[e[0]], verts_cam[e[1]]
-                if v0[1] <= self.near and v1[1] <= self.near:
-                    continue
-                try:
-                    p0 = project_point(self.focal, self.width, self.height, v0)
-                    p1 = project_point(self.focal, self.width, self.height, v1)
-                except Exception:
-                    continue
-                rasterize_line(self.width, self.height, frame, p0, p1, edge_color)
-'''
+
+                base_col = colors[i] if colors is not None else (1.0, 1.0, 1.0)
+                newnormals = []
+                for n in normals:
+                    if np.dot(n, self.light_dir_world) >= 0:
+                        n = -n
+                    newnormals.append(n)
+                shaded_color, _ = self.shade_triangle(newnormals[i], base_col)
+                alpha = float(alphas[i])
+
+                for ci in range(ntris):
+                    cv0, cv1, cv2 = clipped[ci]
+
+                    try:
+                        p2d = [
+                            project_point(self.focal, self.width, self.height, cv0),
+                            project_point(self.focal, self.width, self.height, cv1),
+                            project_point(self.focal, self.width, self.height, cv2)
+                        ]
+                    except:
+                        continue
+
+                    depths = np.array([cv0[1], cv1[1], cv2[1]], dtype=np.float32)
+                    avg_depth = float((depths[0] + depths[1] + depths[2]) / 3.0)
+
+                tri_list.append((avg_depth, p2d, depths, shaded_color, alpha))
+
+        tri_list.sort(key=lambda x: x[0], reverse=True)
+
+        for _, p2d, depths, shaded_color, alpha in tri_list:
+            rasterize_transparent(
+            self.width, self.height,
+            self.zbuffer, frame,
+            p2d,
+            depths,
+            shaded_color,
+            alpha
+            )
