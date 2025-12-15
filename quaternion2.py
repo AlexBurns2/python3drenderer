@@ -1,7 +1,6 @@
 import tkinter as tk
 import math
 
-# ---------- Quaternion class ----------
 class Quaternion:
     def __init__(self, w, x, y, z):
         self.w = float(w)
@@ -18,7 +17,6 @@ class Quaternion:
         z = self.w*other.z + self.x*other.y - self.y*other.x + self.z*other.w
         return Quaternion(w, x, y, z)
 
-    # enable q1 * q2 syntax
     def __mul__(self, other):
         return self.multiply(other)
 
@@ -32,7 +30,6 @@ class Quaternion:
         return Quaternion(self.w/L, self.x/L, self.y/L, self.z/L)
 
     def rotate_vector(self, v):
-        """Rotate 3-tuple v by this quaternion"""
         qv = Quaternion(0, v[0], v[1], v[2])
         r = self * qv * self.conjugate()
         return (r.x, r.y, r.z)
@@ -44,31 +41,26 @@ class Quaternion:
         return f"Quaternion({self.w:.4f}, {self.x:.4f}, {self.y:.4f}, {self.z:.4f})"
 
 
-# ---------- Cube data ----------
 vertices = [
     (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
     (-1, -1,  1), (1, -1,  1), (1, 1,  1), (-1, 1,  1),
 ]
 edges = [(0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),(0,4),(1,5),(2,6),(3,7)]
 
-# global orientation quaternion (identity)
 orientation = Quaternion(1, 0, 0, 0)
 
-# ---------- TK setup ----------
 root = tk.Tk()
-root.title("Quaternion Cube - drag to rotate / edit w,x,y,z")
+root.title("cube")
 
-# layout: left control frame, right canvas
 control_frame = tk.Frame(root)
 control_frame.pack(side="left", fill="y", padx=6, pady=6)
 
 canvas = tk.Canvas(root, width=600, height=600, bg="white")
 canvas.pack(side="right", expand=True, fill="both")
 
-# projection params
-CX, CY = 300, 300   # canvas center
-FOV = 300           # focal length
-Z_OFFSET = 5.0      # starting distance from camera
+CX, CY = 300, 300 
+FOV = 300          
+Z_OFFSET = 5.0     
 
 def project(pt):
     x, y, z = pt
@@ -80,23 +72,15 @@ def project(pt):
     sy = CY - y * s * 40
     return sx, sy
 
-# --- Mouse wheel zoom ---
 def on_mouse_wheel(event):
     global Z_OFFSET
-    # Windows: event.delta is ±120 per notch
-    # Linux/Mac may give different values; we scale it
     if event.delta > 0:
-        Z_OFFSET = max(1.0, Z_OFFSET - 0.5)  # zoom in
+        Z_OFFSET = max(1.0, Z_OFFSET - 0.5) 
     else:
-        Z_OFFSET += 0.5  # zoom out
+        Z_OFFSET += 0.5 
     draw_cube()
 
-# bind zoom
-canvas.bind("<MouseWheel>", on_mouse_wheel)        # Windows
-canvas.bind("<Button-4>", lambda e: on_mouse_wheel(type("e", (), {"delta":+120})()))  # Linux scroll up
-canvas.bind("<Button-5>", lambda e: on_mouse_wheel(type("e", (), {"delta":-120})()))  # Linux scroll down
-
-# ---------- UI controls ----------
+canvas.bind("<MouseWheel>", on_mouse_wheel) 
 tk.Label(control_frame, text="Quaternion (w, x, y, z)").pack(pady=(0,4))
 
 w_var = tk.StringVar()
@@ -155,7 +139,6 @@ hint.pack(pady=(10,0))
 quat_label = tk.Label(control_frame, text=str(orientation), justify="left")
 quat_label.pack(pady=(12,0))
 
-# ---------- Projection & drawing ----------
 def project(pt):
     x, y, z = pt
     z = z + Z_OFFSET
@@ -169,16 +152,13 @@ def project(pt):
 def draw_cube():
     canvas.delete("all")
     rotated = [orientation.rotate_vector(v) for v in vertices]
-    # draw edges
     for a, b in edges:
         x1, y1 = project(rotated[a])
         x2, y2 = project(rotated[b])
         canvas.create_line(x1, y1, x2, y2, width=2)
-    # update label & entries
     quat_label.config(text=f"{orientation}")
     update_entry_vars()
 
-# ---------- Mouse drag to rotate (accumulate orientation) ----------
 last_mouse = None
 
 def on_mouse_press(event):
@@ -195,14 +175,11 @@ def on_mouse_drag(event):
     dy = event.y - y0
     last_mouse = (event.x, event.y)
 
-    # sensitivity and angle based on drag distance
-    sensitivity = 0.007   # tweak to taste
+    sensitivity = 0.007 
     angle = math.sqrt(dx*dx + dy*dy) * sensitivity
     if angle == 0:
         return
 
-    # choose axis in camera plane so dragging right/left rotates around Y and up/down around X
-    # axis = (ay, ax, az) mapping - you can flip signs if rotation feels reversed
     ax = dy
     ay = -dx
     az = 0.0
@@ -216,7 +193,6 @@ def on_mouse_drag(event):
                     ay * math.sin(angle/2),
                     az * math.sin(angle/2))
 
-    # accumulate: apply incremental rotation dq before the existing orientation
     orientation = (dq * orientation).normalize()
     draw_cube()
 
@@ -228,7 +204,6 @@ canvas.bind("<ButtonPress-1>", on_mouse_press)
 canvas.bind("<B1-Motion>", on_mouse_drag)
 canvas.bind("<ButtonRelease-1>", on_mouse_release)
 
-# ---------- Keyboard controls for direct quaternion tweaking ----------
 STEP = 0.05
 
 def modify_component(comp, delta):
@@ -245,7 +220,6 @@ def modify_component(comp, delta):
     orientation = Quaternion(w, x, y, z).normalize()
     draw_cube()
 
-# Bind lower-case to increase, upper-case (Shift) to decrease.
 root.bind("<KeyPress-w>", lambda e: modify_component('w', +STEP))
 root.bind("<KeyPress-W>", lambda e: modify_component('w', -STEP))
 root.bind("<KeyPress-x>", lambda e: modify_component('x', +STEP))
@@ -255,10 +229,8 @@ root.bind("<KeyPress-Y>", lambda e: modify_component('y', -STEP))
 root.bind("<KeyPress-z>", lambda e: modify_component('z', +STEP))
 root.bind("<KeyPress-Z>", lambda e: modify_component('z', -STEP))
 
-# Reset by pressing space
 root.bind("<space>", lambda e: reset_orientation())
 
-# ---------- initialize ----------
 update_entry_vars()
 draw_cube()
 root.mainloop()
